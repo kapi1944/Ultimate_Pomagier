@@ -179,6 +179,8 @@ jobs:
           if [[ ! -f "$ANDROID_AVD_HOME/odbior410.ini" && -f "$ANDROID_AVD_HOME/odbior410.avd/config.ini" ]]; then
             printf 'avd.ini.encoding=UTF-8\npath=%s/odbior410.avd\ntarget=android-34\n' "$ANDROID_AVD_HOME" > "$ANDROID_AVD_HOME/odbior410.ini"
           fi
+          sed -i '/^hw.keyboard[[:space:]]*=/d' "$ANDROID_AVD_HOME/odbior410.avd/config.ini"
+          printf '\nhw.keyboard=yes\n' >> "$ANDROID_AVD_HOME/odbior410.avd/config.ini"
           "$ANDROID_HOME/emulator/emulator" -list-avds | grep -x odbior410
           nohup "$ANDROID_HOME/emulator/emulator" -avd odbior410 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator-odbior-410.log" 2>&1 &
           emulator_pid=$!
@@ -190,10 +192,13 @@ jobs:
           test "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
-          adb shell ime disable com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME || true
+          adb shell wm size 1080x2400
+          adb shell wm density 240
+          adb shell settings put secure show_ime_with_hard_keyboard 0
       - run: python testy/aktualizacjaAndroid.natywna.py
       - name: Diagnostyka emulatora
         if: failure()
         run: |
           if [[ -f "$RUNNER_TEMP/emulator-odbior-410.log" ]]; then tail -60 "$RUNNER_TEMP/emulator-odbior-410.log"; fi
           adb shell getprop ro.product.cpu.abilist || true
+          adb shell uiautomator dump /sdcard/odbior-pomagiera.xml && adb shell cat /sdcard/odbior-pomagiera.xml || true
