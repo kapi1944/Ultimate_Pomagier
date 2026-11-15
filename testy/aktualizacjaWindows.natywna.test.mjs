@@ -94,6 +94,7 @@ test('Instalacja Windows 4.0.0 → 4.1.0 zachowuje profil i chroni otwarty formu
     const baza = join(katalogDanych, 'konta', 'konta.sqlite3')
     assert.ok((await stat(baza)).size > 0)
     await cp(katalogDanych, join(process.env.RUNNER_TEMP, 'Pomagier-kopia-400'), { recursive: true, errorOnExist: true, force: false })
+    console.log('4.0.0: zapisano konto, zadanie i szkic oraz wykonano kopię profilu.')
 
     zainstaluj('4.1.0', 'Ultimate_Pomagier_4.1.0_Setup.exe')
     for (let powtorzenie = 0; powtorzenie < 2; powtorzenie++) {
@@ -109,14 +110,16 @@ test('Instalacja Windows 4.0.0 → 4.1.0 zachowuje profil i chroni otwarty formu
       await strona.getByText(zadanie, { exact: true }).first().waitFor()
       await otworzSzczegoly(strona, 'kopie-robocze')
       await strona.getByText(szkic, { exact: true }).waitFor()
+      console.log(`4.1.0, uruchomienie ${powtorzenie + 1}: logowanie, zadanie i szkic zachowane.`)
       if (powtorzenie === 0) {
         await otworzSzczegoly(strona, 'nowe')
         await tytul(strona).fill('Niezapisana zmiana testowa')
-        await strona.getByText('Niezapisane zmiany', { exact: true }).waitFor()
+        await strona.waitForFunction(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true })))
         await zamknij(strona)
         const dialog = strona.getByRole('dialog', { name: 'Masz niezapisane zmiany' })
         await dialog.getByRole('button', { name: 'ANULUJ', exact: true }).click()
         assert.equal(await tytul(strona).inputValue(), 'Niezapisana zmiana testowa')
+        console.log('Anulowanie zamknięcia natywnego okna zachowało edytowaną wartość.')
         await strona.getByRole('button', { name: 'Zapisz wersję roboczą', exact: true }).click()
         await otworzSzczegoly(strona, 'kopie-robocze')
       }
