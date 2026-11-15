@@ -47,7 +47,7 @@
 .checklista-paczki textarea:disabled { cursor: not-allowed; opacity: .56; }
 .checklista-paczki input,
 .checklista-paczki select,
-.checklista-paczki textarea { width: 100%; padding: 7px 9px; }
+.checklista-paczki textarea { width: 100%; min-width: 0; padding: 7px 9px; }
 .checklista-paczki textarea { min-height: 72px; resize: vertical; }
 .checklista-paczki input[type='checkbox'] { width: auto; min-height: auto; accent-color: var(--checklista-akcent); }
 
@@ -440,4 +440,9 @@
   .checklista-paczki__obszar-pracy > .generator-dokumentu__panel { padding: 6px; }
   .checklista-paczki__obszar-pracy .checklista-paczki__karta { padding: 6px; }
   .checklista-paczki__pola-szczegolow { grid-template-columns: minmax(0, 1fr); }
+}
+
+@container (max-width: 300px) {
+  .checklista-paczki__pozycja-kompletowania { grid-template-columns: minmax(0, 1fr); }
+  .checklista-paczki__pozycja-kompletowania > * { grid-area: auto; }
 }
