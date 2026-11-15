@@ -173,9 +173,21 @@ jobs:
         run: |
           sudo chown "$(id -u)" /dev/kvm
           sdkmanager 'system-images;android-34;google_apis;x86_64'
-          avdmanager create avd --name odbior-410 --package 'system-images;android-34;google_apis;x86_64' --device pixel_6 <<< no
-          nohup "$ANDROID_HOME/emulator/emulator" -avd odbior-410 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator-odbior-410.log" 2>&1 &
-          timeout 300 bash -c 'adb wait-for-device; until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/avd-odbior-410"
+          mkdir -p "$ANDROID_AVD_HOME"
+          avdmanager -v create avd --force --name odbior410 --package 'system-images;android-34;google_apis;x86_64' --path "$ANDROID_AVD_HOME/odbior410.avd" <<< no
+          if [[ ! -f "$ANDROID_AVD_HOME/odbior410.ini" && -f "$ANDROID_AVD_HOME/odbior410.avd/config.ini" ]]; then
+            printf 'avd.ini.encoding=UTF-8\npath=%s/odbior410.avd\ntarget=android-34\n' "$ANDROID_AVD_HOME" > "$ANDROID_AVD_HOME/odbior410.ini"
+          fi
+          "$ANDROID_HOME/emulator/emulator" -list-avds | grep -x odbior410
+          nohup "$ANDROID_HOME/emulator/emulator" -avd odbior410 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator-odbior-410.log" 2>&1 &
+          emulator_pid=$!
+          for proba in {1..100}; do
+            kill -0 "$emulator_pid"
+            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" == 1 ]]; then break; fi
+            sleep 3
+          done
+          test "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1
           adb shell input keyevent KEYCODE_WAKEUP
           adb shell wm dismiss-keyguard
           adb shell ime disable com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME || true
