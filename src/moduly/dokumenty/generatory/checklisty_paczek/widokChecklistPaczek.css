@@ -387,7 +387,17 @@
 }
 
 @container (max-width: 330px) {
-  .checklista-paczki__material td:nth-child(6) { grid-column: 2 / -1; }
+  .checklista-paczki__material .checklista-paczki__akcje-materialu {
+    grid-column: 2 / -1;
+    justify-self: stretch;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+    white-space: normal;
+  }
+  .checklista-paczki__akcje-materialu .checklista-paczki__menu-materialu { margin-left: 0; }
+  .checklista-paczki__material td { overflow-wrap: anywhere; }
 }
 .checklista-paczki__material[data-gotowa='true'] { background: color-mix(in srgb, var(--ui-success) 7%, var(--ui-powierzchnia)); }
 .checklista-paczki__uchwyt { cursor: grab; width: 28px; }
