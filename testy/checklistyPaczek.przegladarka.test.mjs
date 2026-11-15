@@ -86,6 +86,12 @@ test('ergonomia checklist: tabela, klawiatura, przeciąganie, korekty i macierz 
     await poleNazwy.press('End')
     assert.equal(await poleNazwy.inputValue(), dlugaNazwa)
     assert.equal(await poleNazwy.evaluate((pole) => pole.selectionStart), dlugaNazwa.length)
+    // Zmiana rozmiaru okna może pozostawić wskaźnik nad strefą wysuwania panelu.
+    await strona.getByRole('button', { name: 'Edytuj układ', exact: true }).click()
+    const panelUkladu = strona.getByRole('complementary', { name: 'Edytuj układ', exact: true })
+    await panelUkladu.getByTitle('Wyłącz wysuwanie z prawej krawędzi').click()
+    await panelUkladu.getByRole('button', { name: 'Zamknij: Edytuj układ', exact: true }).click()
+    await panelUkladu.waitFor({ state: 'hidden' })
     const wyniki = []
     await mkdir('tmp/checklisty-ux', { recursive: true })
     for (const [szerokosc, wysokosc] of [[1920,1080], [1440,900], [1366,768], [1280,720], [1024,768], [768,1024], [390,844]]) {
