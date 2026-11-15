@@ -40,7 +40,8 @@ def znajdz(warunek):
 
 
 def po_tekscie(nazwa):
-    return znajdz(lambda elementy: next((e for e in elementy if nazwa in etykiety(e)), None))
+    return znajdz(lambda elementy: next((e for e in elementy
+                                         if nazwa.casefold() in [etykieta.casefold() for etykieta in etykiety(e)]), None))
 
 
 def kliknij(element):
