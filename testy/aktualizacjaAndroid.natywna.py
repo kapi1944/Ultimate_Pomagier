@@ -82,6 +82,14 @@ def sprawdz_eksport_pdf():
     for nazwa in ("Otwórz menu", "Dokumenty", "Karta na drzwi", "Nowa karta na drzwi"):
         kliknij(po_tekscie(nazwa))
     po_tekscie("Zestaw i karta")
+    pole_tytulu = znajdz(lambda elementy: next((e for e in elementy
+                                               if e.get("class") == "android.widget.EditText"), None))
+    kliknij(pole_tytulu)
+    adb("shell", "input", "text", "TestowaKartaOdbior410")
+    kliknij(po_tekscie("Zapisz"))
+    po_tekscie("Zestaw zapisano w rejestrze dokumentów.")
+    print("Karty na drzwi: otwarto generator i zapisano kartę testową.", flush=True)
+    adb("logcat", "-c")
     kliknij(po_tekscie("PDF wybranej karty"))
     for _ in range(15):
         pliki = adb("shell", "ls", "-1", "/sdcard/Download").splitlines()
@@ -92,11 +100,14 @@ def sprawdz_eksport_pdf():
                 print("Karty na drzwi: zapisano rzeczywisty plik PDF.", flush=True)
                 return
         elementy = ekran()
+        if any("Nie udało się utworzyć pliku PDF." in " ".join(etykiety(e)) for e in elementy):
+            raise RuntimeError("Aplikacja zgłosiła błąd generowania PDF")
         if any("Krótka nazwa pliku" in etykiety(e) for e in elementy):
             kliknij(po_tekscie("Krótka nazwa pliku"))
             adb("shell", "input", "text", "KartaOdbior410")
             kliknij(po_tekscie("Pobierz PDF"))
         time.sleep(1)
+    print(adb("logcat", "-d", "-t", "300", "-s", "AndroidRuntime", "chromium", "System.err", "DownloadManager"), flush=True)
     raise RuntimeError("Brak wyeksportowanego PDF w katalogu Download")
 
 
