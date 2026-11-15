@@ -42,7 +42,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: windows-wydanie-${{ github.event_name == 'pull_request' && github.ref || 'publikacja' }}
+  group: windows-wydanie-${{ github.ref == 'refs/heads/testy/odbior-windows-4.1.0' && format('odbior-{0}', inputs.kanal) || github.event_name == 'pull_request' && github.ref || 'publikacja' }}
   cancel-in-progress: false
 
 jobs:
