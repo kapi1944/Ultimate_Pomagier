@@ -47,6 +47,7 @@ concurrency:
 
 jobs:
   instalator:
+    if: ${{ github.ref != 'refs/heads/testy/odbior-windows-4.1.0' }}
     runs-on: windows-2022
     env:
       POMAGIER_KANAL_AKTUALIZACJI: ${{ inputs.kanal || 'stabilny' }}
@@ -112,3 +113,33 @@ jobs:
             wydanie-desktop/podpisane/wydanie-windows.json
           if-no-files-found: error
           retention-days: 30
+
+  odbior-migracji:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/testy/odbior-windows-4.1.0' }}
+    runs-on: windows-2022
+    timeout-minutes: 18
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 40482903555
+          pattern: Ultimate-Pomagier-Windows-*
+          path: tmp/odbior-windows/4.0.0
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 43713741684
+          pattern: Ultimate-Pomagier-Windows-*
+          path: tmp/odbior-windows/4.1.0
+          merge-multiple: true
+      - run: node --test testy/aktualizacjaWindows.natywna.test.mjs
