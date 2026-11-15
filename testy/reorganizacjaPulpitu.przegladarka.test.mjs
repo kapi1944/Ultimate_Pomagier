@@ -34,19 +34,23 @@ test('Pulpit: kolejność, rutyny, zapis wykonania, daty, palety i skale', { tim
     await strona.reload()
     assert.equal(await pole.isChecked(), true)
     await os.getByRole('button', { name: 'Szczegóły rutyny: Kontrola 1' }).click()
-    await strona.locator('#podsumowanie-rutyn').getByRole('heading', { name: 'Kontrola 1', exact: true }).waitFor()
-    await strona.getByRole('button', { name: 'Zamknij szczegóły', exact: true }).click()
+    const szczegolyRutyny = strona.getByRole('dialog', { name: 'Kontrola 1', exact: true })
+    await szczegolyRutyny.getByRole('heading', { name: 'Kontrola 1', exact: true }).waitFor()
+    await szczegolyRutyny.getByRole('button', { name: 'Zamknij', exact: true }).click()
+    await szczegolyRutyny.waitFor({ state: 'hidden' })
     const datownik = strona.locator('.pulpit-nawigacja-daty input')
     await datownik.fill('2026-11-01')
     assert.equal(await os.locator('.pulpit-rutyna').count(), 0)
     await datownik.fill('2026-11-02')
     await os.locator('.pulpit-rutyna').first().waitFor()
+    await strona.setViewportSize({ width: 390, height: 844 })
+    await strona.getByRole('button', { name: 'Pokaż dock', exact: true }).click()
+    await strona.locator('.dock-aplikacji').waitFor()
     const palety = ['EMERALD_DARK', 'SOFT_GREY', 'DARK_GRAY', 'DOMYSLNA', 'CRM', 'DDP', 'SEMPER', 'EVENTIS', 'ARKUSZE_GOOGLE']
     for (const paleta of palety) for (const skala of [75, 85]) {
       await strona.evaluate(({ paleta, skala }) => { document.documentElement.dataset.uiPaleta = paleta; document.documentElement.style.setProperty('--ui-skala-przegladarki', String(skala / 100)) }, { paleta, skala })
       for (const rozmiar of [{ width: 1500, height: 870 }, { width: 1366, height: 768 }, { width: 390, height: 844 }, { width: 844, height: 390 }]) {
         await strona.setViewportSize(rozmiar)
-        if (await strona.getByRole('button', { name: 'Pokaż dock', exact: true }).count()) await strona.getByRole('button', { name: 'Pokaż dock', exact: true }).click()
         const pomiar = await strona.evaluate(() => {
           const rutyny = [...document.querySelectorAll('.pulpit-rutyna__kontrolki')].map((element) => element.getBoundingClientRect())
           const naglowek = document.querySelector('.naglowek-aplikacji'), dock = document.querySelector('.dock-aplikacji'), obszar = document.querySelector('.uklad-aplikacji__obszar-roboczy')

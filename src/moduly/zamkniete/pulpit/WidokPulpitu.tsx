@@ -23,6 +23,7 @@ import type { Dokument } from '../../../wspolne/dokumenty/modelDokumentu'
 import { zdarzenieZmianyRejestruDokumentow } from '../../../wspolne/dokumenty/rejestrDokumentow'
 import WidokRutyn from './DailyRoutines'
 import RutynyNaOsi from './RutynyNaOsi'
+import { pobierzStylBlokuPracy } from './koloryBlokowPracy'
 import { useRutynyPulpitu } from './useRutynyPulpitu'
 import { dataWarszawska } from '../../../wspolne/czas/kalendarzPracy'
 import { generujZadaniaAutomatyczne } from './logika/zadaniaAutomatyczne'
@@ -966,7 +967,10 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
           <Przycisk className="pulpit-nawigacja-daty__strzalka" aria-label="Następny dzień" onClick={() => ustawDate(przesunDate(data, 1))} type="button">&rsaquo;</Przycisk>
           <input aria-label="Wybierz datę planu" onChange={(zdarzenie) => ustawDate(zdarzenie.target.value)} type="date" value={data} />
         </div>
-        <button ref={przyciskOsiRef} className="pulpit-dostosuj-os" type="button" aria-expanded={roboczaOs !== null} aria-controls="pulpit-panel-osi" onClick={() => { ustawPelnaOs(false); ustawRoboczaOs({ ...zapisanaOs }); ustawRoboczeBloki(czyJestAdministratorem(zalogowanyUzytkownik) ? { poprzednie: harmonogram.blokiPracy, nowe: harmonogram.blokiPracy } : null); ustawKomunikatOsi('') }}>⚙ Dostosuj oś</button>
+        <div className="pulpit-sekcja__akcje-osi">
+          <button ref={przyciskOsiRef} className="pulpit-dostosuj-os" type="button" aria-expanded={roboczaOs !== null} aria-controls="pulpit-panel-osi" onClick={() => { ustawPelnaOs(false); ustawRoboczaOs({ ...zapisanaOs }); ustawRoboczeBloki(czyJestAdministratorem(zalogowanyUzytkownik) ? { poprzednie: harmonogram.blokiPracy, nowe: harmonogram.blokiPracy } : null); ustawKomunikatOsi('') }}>⚙ Dostosuj oś</button>
+          {!roboczaOs && <Przycisk type="button" onClick={() => ustawPelnaOs(!pelnaOs)}>{pelnaOs ? 'Wróć do zapisanego zakresu' : 'Pokaż pełną dobę jednorazowo'}</Przycisk>}
+        </div>
       </div>
       {roboczaOs && <form id="pulpit-panel-osi" className="pulpit-panel-osi" aria-label="Dostosuj oś" onSubmit={zapiszUstawieniaOsi} onKeyDown={(zdarzenie) => { if (zdarzenie.key === 'Escape') { zdarzenie.stopPropagation(); zamknijUstawieniaOsi() } }}>
         <PolaOsiCzasu wartosc={roboczaOs} zmien={ustawRoboczaOs} praca={godzinyPracy} />
@@ -992,11 +996,11 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
           </div>}
         </div>
         <div className="pulpit-os-czasu__pas-blokow">
-          {blokiDnia.filter((blok) => blok.koniec > osCzasu.poczatek && blok.poczatek < osCzasu.koniec).map((blok, indeks) => {
+          {blokiDnia.filter((blok) => blok.koniec > osCzasu.poczatek && blok.poczatek < osCzasu.koniec).map((blok) => {
             const poczatek = pozycjaGodzinyNaOsi(blok.poczatek, zakresDniaPracy)
             const koniec = pozycjaGodzinyNaOsi(blok.koniec, zakresDniaPracy)
             const opis = blok.nazwa + ': ' + blok.poczatek + '–' + blok.koniec
-            return <span key={blok.id} tabIndex={0} aria-label={opis} title={opis} className={'pulpit-blok-pracy pulpit-blok-pracy--' + indeks % 3} style={{ left: poczatek + '%', width: koniec - poczatek + '%', borderBottomColor: blok.kolor, background: blok.kolor ? `color-mix(in srgb, ${blok.kolor} 24%, var(--ui-panel))` : undefined }}><span>{blok.nazwa}</span></span>
+            return <span key={blok.id} tabIndex={0} aria-label={opis} title={opis} className="pulpit-blok-pracy" style={{ ...pobierzStylBlokuPracy(blok, blokiDnia), left: poczatek + '%', width: koniec - poczatek + '%' }}><span>{blok.nazwa}</span></span>
           })}
         </div>
         {oknoKuriera && oknoKuriera.koniec > osCzasu.poczatek && oknoKuriera.poczatek < osCzasu.koniec && <div className="pulpit-os-czasu__pas-zdarzen">
@@ -1022,7 +1026,6 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
       </div></div>
       {oknoKuriera && oknoKuriera.koniec > osCzasu.poczatek && oknoKuriera.poczatek < osCzasu.koniec && pokazOpisKuriera && <p className="pulpit-okno-kuriera__podpowiedz">{opisKuriera}</p>}
       {zadaniaPozaOsia.length > 0 && <details className="pulpit-poza-osia"><summary>Zadania poza zakresem osi ({zadaniaPozaOsia.length})</summary><ul>{zadaniaPozaOsia.map((zadanie) => { const godzina = pobierzGodzineMarkeraZadania(zadanie, zakresDniaPracy)!; return <li key={zadanie.id}><Przycisk type="button" onClick={() => otworzZadanie(zadanie)}>{godzina < osCzasu.poczatek ? 'Przed' : 'Po'} zakresem · {godzina} · {zadanie.tytul}</Przycisk></li> })}</ul></details>}
-      {!roboczaOs && <Przycisk className="pulpit-pelna-os" type="button" onClick={() => ustawPelnaOs(!pelnaOs)}>{pelnaOs ? 'Wróć do zapisanego zakresu' : 'Pokaż pełną dobę jednorazowo'}</Przycisk>}
 
 
       <div className="pulpit-podsekcja">

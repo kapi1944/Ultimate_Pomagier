@@ -10,6 +10,7 @@ test('rutyna na pulpicie: tworzenie, wykonanie, cofnięcie, restart i małe ekra
   try {
     const kontekst = await przegladarka.newContext({ viewport: { width: 1440, height: 900 }, timezoneId: 'Europe/Warsaw' })
     const strona = await kontekst.newPage()
+    await strona.clock.setFixedTime(new Date('2026-11-02T11:00:00Z'))
     const bledy = []
     strona.on('pageerror', (blad) => bledy.push(blad.message))
     await strona.goto(process.env.POMAGIER_ADRES || 'http://127.0.0.1:5173')

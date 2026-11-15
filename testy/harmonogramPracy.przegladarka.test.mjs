@@ -287,7 +287,10 @@ test('Plan dnia rozdziela warstwy i zachowuje rutyny przy zmianach granic blokó
     })
     assert.ok(geometria)
     await grupa.getByRole('button', { name: 'Szczegóły rutyny: ' + dlugiTytul, exact: true }).press('Enter')
-    await strona.getByRole('heading', { name: dlugiTytul, exact: true }).waitFor()
+    const szczegolyRutyny = strona.getByRole('dialog', { name: dlugiTytul, exact: true })
+    await szczegolyRutyny.getByRole('heading', { name: dlugiTytul, exact: true }).waitFor()
+    await strona.keyboard.press('Escape')
+    await szczegolyRutyny.waitFor({ state: 'hidden' })
 
     await otworz.click()
     const rozruch = panel.getByRole('group', { name: 'Rozruch', exact: true })
