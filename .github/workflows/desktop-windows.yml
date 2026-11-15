@@ -98,6 +98,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run desktop:release
       - name: Zachowanie instalatora i sum kontrolnych
+        if: ${{ inputs.podpisane || github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v4
         with:
           name: Ultimate-Pomagier-Windows-${{ github.run_number }}
