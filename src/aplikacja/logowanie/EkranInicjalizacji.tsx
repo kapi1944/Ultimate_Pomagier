@@ -1,3 +1,4 @@
+import { informacjeOWersji } from '../wersjaAplikacji'
 import './panelLogowania.css'
 
 type WlasciwosciEkranuInicjalizacji = { etap: string }
@@ -5,7 +6,7 @@ type WlasciwosciEkranuInicjalizacji = { etap: string }
 export default function EkranInicjalizacji({ etap }: WlasciwosciEkranuInicjalizacji) {
   return <main className="ekran-inicjalizacji" aria-live="polite" aria-busy="true">
     <img className="ekran-inicjalizacji__logo" src="/logo-ultimate-pomagier-tabliczka.png" alt="Ultimate Pomagier" />
-    <h1>Ultimate Pomagier 4.0</h1>
+    <h1>{informacjeOWersji.nazwaProduktu}</h1>
     <p className="ekran-inicjalizacji__etap">{etap}</p>
     <div className="ekran-inicjalizacji__animacja" aria-hidden="true"><span /><span /><span /></div>
     <div className="ekran-inicjalizacji__postep">

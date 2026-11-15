@@ -70,7 +70,7 @@ function Sprawdz-Aktualizacje {
             return
         }
         $zdalny = Wywolaj-Git @('remote', 'get-url', 'origin')
-        if ($zdalny -notmatch '^(https://github\.com/kapi1944/Ultimate_Pomagier_3_5(?:\.git)?/?|git@github\.com:kapi1944/Ultimate_Pomagier_3_5(?:\.git)?|ssh://git@github\.com/kapi1944/Ultimate_Pomagier_3_5(?:\.git)?)$') { throw 'origin nie wskazuje repozytorium kapi1944/Ultimate_Pomagier_3_5.' }
+        if ($zdalny -notmatch '^(https://github\.com/kapi1944/Ultimate_Pomagier(?:\.git)?/?|git@github\.com:kapi1944/Ultimate_Pomagier(?:\.git)?|ssh://git@github\.com/kapi1944/Ultimate_Pomagier(?:\.git)?)$') { throw 'origin nie wskazuje repozytorium kapi1944/Ultimate_Pomagier.' }
         $staryPrompt = $env:GIT_TERMINAL_PROMPT
         $starySsh = $env:GIT_SSH_COMMAND
         try {

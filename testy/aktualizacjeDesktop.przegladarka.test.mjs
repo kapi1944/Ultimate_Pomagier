@@ -27,7 +27,7 @@ test('panel aktualizacji: oba kanały, podpis, pobranie, zgoda, błędy i zachow
         stan.kanaly.push(dane.target);
         if (stan.tryb === 'aktualna') return null;
         if (stan.tryb === 'siec') throw new Error('Brak sieci');
-        return { rid: 1, currentVersion: '4.0.0', version: '4.0.1', body: 'Poprawiono aktualizacje Windows.', rawJson: {
+        return { rid: 1, currentVersion: '4.0.0', version: '4.1.0', body: 'Poprawiono aktualizacje Windows.', rawJson: {
           kanal: dane.target.replace('windows-', ''), zgodnoscDanych: stan.tryb === 'niezgodna' ? 2 : 1, commit: 'a'.repeat(40)
         } };
       }
@@ -68,8 +68,8 @@ test('panel aktualizacji: oba kanały, podpis, pobranie, zgoda, błędy i zachow
     })
     const danePrzed = await strona.evaluate(() => JSON.stringify({ ...localStorage }))
     await sprawdz.click()
-    await strona.getByText(/Dostępna wersja 4.0.1/).waitFor()
-    await strona.getByText('Informacje o zmianach — 4.0.1', { exact: true }).click()
+    await strona.getByText(/Dostępna wersja 4.1.0/).waitFor()
+    await strona.getByText('Informacje o zmianach — 4.1.0', { exact: true }).click()
     await strona.getByText('Poprawiono aktualizacje Windows.', { exact: true }).waitFor()
     const instaluj = strona.getByRole('button', { name: 'Zainstaluj aktualizację', exact: true })
     const pobierz = strona.getByRole('button', { name: 'Pobierz aktualizację', exact: true })
@@ -95,7 +95,7 @@ test('panel aktualizacji: oba kanały, podpis, pobranie, zgoda, błędy i zachow
     await strona.getByRole('combobox', { name: 'Kanał aktualizacji' }).selectOption('testowy')
     await strona.getByText(/Wersje eksperymentalne/).waitFor()
     await sprawdz.click()
-    await strona.getByText(/Dostępna wersja 4.0.1/).waitFor()
+    await strona.getByText(/Dostępna wersja 4.1.0/).waitFor()
     assert.deepEqual(await strona.evaluate(() => window.stanTestu.kanaly), ['windows-stabilny', 'windows-testowy'])
     await strona.getByRole('button', { name: 'Później', exact: true }).click()
     for (const [tryb, komunikat] of [['aktualna', /Brak nowszego wydania/], ['niezgodna', /Wydanie odrzucono/], ['siec', /Nie udało się sprawdzić wydania/]]) {

@@ -10,7 +10,7 @@ function wydanie(wersja = '4.0.0', testowe = false) {
   ] }
   return { id: 1, tag_name: `v${wersja}`, draft: false, prerelease: testowe, published_at: '2026-10-25T10:00:00Z',
     body: `Opis zmian.\n\n\`\`\`pomagier-wydanie\n${JSON.stringify(manifest)}\n\`\`\``,
-    assets: [{ name: nazwa, size: 100, state: 'uploaded', digest: `sha256:${suma}`, browser_download_url: `https://github.com/kapi1944/Ultimate_Pomagier_3_5/releases/download/v${wersja}/${nazwa}` }] }
+    assets: [{ name: nazwa, size: 100, state: 'uploaded', digest: `sha256:${suma}`, browser_download_url: `https://github.com/kapi1944/Ultimate_Pomagier/releases/download/v${wersja}/${nazwa}` }] }
 }
 
 test('rozpoznaje system bez blokowania innych platform', () => {
