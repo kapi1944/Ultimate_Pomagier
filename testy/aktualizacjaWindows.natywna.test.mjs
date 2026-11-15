@@ -62,6 +62,7 @@ test('Instalacja Windows 4.0.0 → 4.1.0 zachowuje profil i chroni otwarty formu
   const haslo = 'haslo-wylacznie-syntetyczne-410'
   const zadanie = 'Zadanie testowe zapisane w 4.0.0'
   const szkic = 'Szkic testowy utworzony w 4.0.0'
+  const nowySzkic = 'Niezapisana zmiana testowa'
   const sciezkaSzczegolow = '/szkolenia-zamkniete/szczegoly-organizacyjne'
   async function otworzSzczegoly(strona, ekran) {
     await strona.goto(new URL(`${sciezkaSzczegolow}/${ekran}`, strona.url()).href)
@@ -113,17 +114,20 @@ test('Instalacja Windows 4.0.0 → 4.1.0 zachowuje profil i chroni otwarty formu
       console.log(`4.1.0, uruchomienie ${powtorzenie + 1}: logowanie, zadanie i szkic zachowane.`)
       if (powtorzenie === 0) {
         await otworzSzczegoly(strona, 'nowe')
-        await tytul(strona).fill('Niezapisana zmiana testowa')
+        await tytul(strona).fill(nowySzkic)
         await strona.waitForFunction(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true })))
         await zamknij(strona)
         const dialog = strona.getByRole('dialog', { name: 'Masz niezapisane zmiany' })
         await dialog.getByRole('button', { name: 'ANULUJ', exact: true }).click()
-        assert.equal(await tytul(strona).inputValue(), 'Niezapisana zmiana testowa')
+        await dialog.waitFor({ state: 'hidden' })
+        assert.equal(await tytul(strona).inputValue(), nowySzkic)
         console.log('Anulowanie zamknięcia natywnego okna zachowało edytowaną wartość.')
-        await strona.getByRole('button', { name: 'Zapisz wersję roboczą', exact: true }).click()
-        await otworzSzczegoly(strona, 'kopie-robocze')
+        await zamknij(strona)
+        await dialog.getByRole('button', { name: 'ZAPISZ I PRZEJDŹ', exact: true }).click()
+      } else {
+        await strona.getByText(nowySzkic, { exact: true }).waitFor()
+        await zamknij(strona)
       }
-      await zamknij(strona)
       await czekajNaZamkniecie()
     }
   } finally {
