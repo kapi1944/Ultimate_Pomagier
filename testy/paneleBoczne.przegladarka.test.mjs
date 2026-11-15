@@ -45,7 +45,7 @@ test('menu: piksele ekranowe, granice i trwały zapis przy skalach 75–130%', {
 test('logo i szerokości paneli: przeciąganie, zapis, klawiatura i responsywność', { timeout: 90000 }, async () => {
   const przegladarka = await chromium.launch({ channel: 'chrome', headless: true })
   try {
-    const strona = await przegladarka.newPage({ viewport: { width: 1920, height: 1080 } })
+    const strona = await przegladarka.newPage({ viewport: { width: 1920, height: 1080 }, reducedMotion: 'reduce' })
     await strona.goto(`${adres}/dokumenty/programy-szkolen`)
     await strona.getByRole('button', { name: 'Otwórz demonstrację Architekta', exact: true }).click()
     await strona.locator('.menu-boczne').hover()

@@ -357,7 +357,7 @@
 .checklista-paczki__material td:nth-child(2) input { font-size: 15px; }
 .checklista-paczki__material td:nth-child(2) { overflow-wrap: anywhere; }
 
-@container (max-width: 545px) {
+@container (max-width: 580px) {
   .checklista-paczki__tabela-materialow, .checklista-paczki__tabela-materialow tbody,
   .checklista-paczki__tabela-materialow tr:not([hidden]), .checklista-paczki__tabela-materialow td { display: block; }
   .checklista-paczki__tabela-materialow thead,
