@@ -156,17 +156,18 @@
 .pulpit-rutyny-godzinowe:not(:empty) { padding-block: 12px; }
 .pulpit-rutyna { position: relative; padding-top: 14px; }
 .pulpit-rutyna__punkt { position: absolute; top: 0; width: 10px; height: 10px; border: 2px solid var(--ui-info); border-radius: 50%; transform: translateX(-50%); }
-.pulpit-rutyna__kontrolki { display: flex; align-items: center; gap: 4px; width: 240px; max-width: 100%; box-sizing: border-box; padding: 2px 4px; border: 1px solid var(--ui-obramowanie); border-radius: var(--ui-promien-pola); background: var(--ui-info-tlo); }
-.pulpit .pulpit-rutyna__kontrolki button { flex: 1; min-width: 0; min-height: 32px; padding: 2px 4px; font-size: .8rem; text-align: left; }
+.pulpit-rutyna__kontrolki { display: flex; align-items: center; gap: 4px; width: 240px; max-width: 100%; box-sizing: border-box; padding: 2px 4px; border: 1px solid color-mix(in srgb, var(--pulpit-kolor-bloku, var(--ui-obramowanie)) 65%, var(--ui-panel)); border-radius: var(--ui-promien-pola); background: color-mix(in srgb, var(--pulpit-kolor-bloku, var(--ui-obramowanie)) var(--pulpit-nasycenie-rutyny, 32%), var(--ui-panel)); color: var(--ui-tekst); }
+.pulpit .pulpit-rutyna__kontrolki button { flex: 1; min-width: 0; min-height: 32px; padding: 2px 4px; font-size: .8rem; text-align: left; background: transparent; color: inherit; border-color: transparent; }
+.pulpit .pulpit-rutyna__kontrolki button:hover { background: transparent; border-color: var(--pulpit-kolor-bloku, var(--ui-obramowanie)); }
 .pulpit-rutyna__kontrolki button span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .pulpit .pulpit-rutyna__kontrolki input[type="checkbox"] { flex: none; width: 24px; height: 24px; margin: 0; padding: 0; }
-.pulpit-rutyna__kontrolki--wykonane { background: var(--ui-panel); }
-.pulpit-rutyna__kontrolki--wykonane button span { color: var(--ui-tekst-drugi); text-decoration: line-through; }
+.pulpit-rutyna__kontrolki--wykonane { --pulpit-nasycenie-rutyny: 22%; }
+.pulpit-rutyna__kontrolki--wykonane button span { text-decoration: line-through; }
 .pulpit-rutyny-blokowe { display: grid; grid-template-columns: minmax(0, 1fr); margin-block: 8px; }
 .pulpit-rutyna__przedzial { grid-area: 1 / 1; align-self: start; display: grid; gap: 3px; grid-template-columns: minmax(0, 1fr); }
 .pulpit-rutyna__przedzial .pulpit-rutyna__kontrolki { width: 100%; }
-.pulpit .pulpit-rutyna__licznik { box-sizing: border-box; width: 100%; min-width: 0; min-height: 32px; padding: 0; border: 0; overflow: hidden; background: var(--ui-info-tlo); color: var(--ui-tekst); }
-.pulpit-rutyna__skrot { height: 32px; background: var(--ui-info); }
+.pulpit .pulpit-rutyna__licznik, .pulpit .pulpit-rutyna__licznik:hover { box-sizing: border-box; width: 100%; min-width: 0; min-height: 32px; padding: 0; border: 0; overflow: hidden; background: color-mix(in srgb, var(--pulpit-kolor-bloku, var(--ui-obramowanie)) 32%, var(--ui-panel)); color: var(--ui-tekst); }
+.pulpit-rutyna__skrot { height: 32px; background: var(--pulpit-kolor-bloku, var(--ui-obramowanie)); }
 .pulpit-rutyny-bez-godziny { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-block: 8px; }
 
 .pulpit-deadline {
@@ -906,10 +907,25 @@ html[data-ui-pokaz-plomien-asap="false"] .pulpit-deadline__plomien {
 .pulpit-os-czasu__pas-blokow { height: 24px; margin-bottom: 8px; }
 .pulpit-os-czasu__pas-blokow:empty { display: none; }
 .pulpit-os-czasu__pas-zdarzen { height: 28px; margin-bottom: 8px; }
-.pulpit-blok-pracy { position: absolute; inset-block: 0; box-sizing: border-box; background: var(--pulpit-tlo-bloku); border-bottom: 3px solid transparent; color: var(--ui-tekst); font-size: .75rem; line-height: 21px; text-align: center; }
-.pulpit-blok-pracy--1 { background: color-mix(in srgb, var(--ui-info) 18%, var(--ui-panel)); }
-.pulpit-blok-pracy--2 { background: color-mix(in srgb, var(--ui-akcent) 32%, var(--ui-panel)); }
+.pulpit-blok-pracy { position: absolute; inset-block: 0; box-sizing: border-box; background: var(--pulpit-tlo-bloku); border-bottom: 3px solid var(--pulpit-kolor-bloku, transparent); color: var(--ui-tekst); font-size: 14px; font-weight: 700; line-height: 21px; text-align: center; }
 .pulpit-blok-pracy > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pulpit-blok-pracy { container-type: inline-size; }
+@container (max-width: 85px) {
+  .pulpit-blok-pracy > span { font-size: 12px; }
+}
+
+.ui-dialog.pulpit-dialog-rutyny {
+  box-sizing: border-box;
+  width: min(34rem, calc(100% - 24px));
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
+}
+.pulpit-dialog-rutyny::backdrop { background: #0007; backdrop-filter: blur(5px); }
+html:has(.pulpit-dialog-rutyny[open]),
+.uklad-aplikacji .uklad-aplikacji__obszar-roboczy:has(.pulpit-dialog-rutyny[open]) { overflow: hidden; }
+.pulpit-dialog-rutyny__blok { border-inline-start: 4px solid var(--ui-akcent); padding-inline-start: .5rem; }
+.pulpit-dialog-rutyny__akcje { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.pulpit-dialog-rutyny__akcje a { display: inline-flex; align-items: center; text-decoration: none; }
 .pulpit .pulpit-okno-kuriera { position: absolute; inset-block: 0; box-sizing: border-box; min-width: 0; min-height: 0; padding: 0; border: 0; border-radius: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--pulpit-tlo-kuriera); color: var(--ui-tekst); font-size: .8rem; transition: none; }
 .pulpit-okno-kuriera:focus-visible, .pulpit-blok-pracy:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: -2px; }
 .pulpit-panel-osi__bloki { display: grid; gap: 8px; min-width: 0; margin: 0; }
@@ -917,11 +933,12 @@ html[data-ui-pokaz-plomien-asap="false"] .pulpit-deadline__plomien {
 .pulpit-panel-osi__bloki .ustawienia-harmonogram__wiersz { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
 .pulpit-panel-osi__bloki .ustawienia-harmonogram__wiersz label { display: grid; min-width: 0; max-width: 100%; }
 .pulpit-panel-osi__bloki input { max-width: 100%; }
-.pulpit-dostosuj-os { justify-self: end; min-height: 44px; }
+.pulpit .pulpit-sekcja__naglowek--plan { padding-bottom: 8px; }
+.pulpit-sekcja__akcje-osi { justify-self: end; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.pulpit-dostosuj-os { min-height: 44px; }
 .pulpit-panel-osi { box-sizing: border-box; width: min(100%, 640px); justify-self: end; display: grid; gap: 12px; padding: 16px; border: 1px solid var(--ui-obramowanie); border-radius: var(--ui-promien-karty); background: var(--ui-powierzchnia); }
 .pulpit-panel-osi__akcje { display: flex; flex-wrap: wrap; gap: 8px; }
 .pulpit-poza-osia { padding: 8px; border: 1px solid var(--ui-obramowanie); border-radius: var(--ui-promien-pola); }
 .pulpit-poza-osia summary { cursor: pointer; padding: 8px; }
 .pulpit-poza-osia ul { list-style: none; display: grid; gap: 8px; padding: 0; }
 .pulpit-poza-osia button { min-height: 44px; text-align: left; overflow-wrap: anywhere; }
-.pulpit-pelna-os { justify-self: start; }

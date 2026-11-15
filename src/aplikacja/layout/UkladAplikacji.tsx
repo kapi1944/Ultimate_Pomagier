@@ -1,6 +1,8 @@
 import { czyWidokZakupow, trasyZakupow, pobierzSciezkeZakupow, pobierzWidokZakupowZeSciezki } from '../nawigacja/konfiguracjaZakupow'
 import WidokZakupow from '../../moduly/zakupy/WidokZakupow'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { isTauri } from '@tauri-apps/api/core'
+import { getCurrentWindow } from '@tauri-apps/api/window'
 import WidokUstawien from '../ustawienia/WidokUstawien'
 import {
   pobierzUstawieniaAplikacji,
@@ -33,14 +35,14 @@ import {
   wyczyscAktywnaKopieProgramu,
   ustawAktywnaKopieProgramu,
 } from '../../moduly/dokumenty/generatory/programy_szkolen/magazynKopiiRoboczychProgramu'
-import { czyDokumentMaNiezapisaneZmiany, zapiszDokumentPrzedWyjsciem } from '../../moduly/dokumenty/wspolne/strzeznikNiezapisanegoDokumentu'
+import { czyDokumentMaNiezapisaneZmiany, czyTrwaZapisDokumentu, odrzucZmianyDokumentu, zapiszDokumentPrzedWyjsciem } from '../../moduly/dokumenty/wspolne/strzeznikNiezapisanegoDokumentu'
 import WidokReplikatoraDokumentow from '../../moduly/dokumenty/replikator_dokumentow/WidokReplikatoraDokumentow'
 import WidokSzkolenOtwartych from '../../moduly/otwarte/WidokSzkolenOtwartych'
 import WidokPulpitu from '../../moduly/zamkniete/pulpit/WidokPulpitu'
 import WidokKopiiRoboczychSzczegolowOrganizacyjnych from '../../moduly/zamkniete/szczegoly_organizacyjne/widoki/WidokKopiiRoboczychSzczegolowOrganizacyjnych'
 import WidokListySzczegolowOrganizacyjnych from '../../moduly/zamkniete/szczegoly_organizacyjne/widoki/WidokListySzczegolowOrganizacyjnych'
 import WidokNowychSzczegolowOrganizacyjnych from '../../moduly/zamkniete/szczegoly_organizacyjne/widoki/WidokNowychSzczegolowOrganizacyjnych'
-import { rozpocznijNoweSzczegolyOrganizacyjne } from '../../moduly/zamkniete/szczegoly_organizacyjne/uslugi/magazynWersjiRoboczych'
+import { pobierzAktualnaWersjeRobocza, pobierzIdInstancjiSzczegolow, pobierzKopieRobocze, rozpocznijNoweSzczegolyOrganizacyjne, ustawAktualnaWersjeRobocza, ustawIdInstancjiSzczegolow, utworzNowaInstancjeSzczegolow, wyczyscAktualnaWersjeRobocza } from '../../moduly/zamkniete/szczegoly_organizacyjne/uslugi/magazynWersjiRoboczych'
 import WidokGeneratoraSzczegolow from '../../moduly/zamkniete/szkolenia/generator_szczegolow/WidokGeneratoraSzczegolow'
 import WidokSzkolenZamknietych from '../../moduly/zamkniete/szkolenia/WidokSzkolenZamknietych'
 import { pobierzSciezkeGeneratoraDokumentu } from '../../wspolne/dokumenty/konfiguracjaDokumentow'
@@ -60,6 +62,7 @@ type OpcjeZmianyWidoku = {
   zachowajKopieSzczegolow?: boolean
   pomijajOstrzezenie?: boolean
   uzytkownikId?: string
+  przygotujZmiane?: () => boolean | void
 }
 
 type UstawWidok = (widok: WidokNawigacji, opcje?: OpcjeZmianyWidoku) => void
@@ -139,7 +142,23 @@ function pobierzIdProfiluZeSciezki() {
 
 function pobierzPoczatkowaWersjeFormularzaSzczegolow() {
   if (window.location.pathname === '/szkolenia-zamkniete/szczegoly-organizacyjne/nowe') {
-    rozpocznijNoweSzczegolyOrganizacyjne()
+    const stanTrasy = window.history.state && typeof window.history.state === 'object'
+      ? window.history.state as { szczegolyInstancjiId?: unknown; szczegolyKopiaId?: unknown }
+      : {}
+    if (typeof stanTrasy.szczegolyInstancjiId === 'string' && stanTrasy.szczegolyInstancjiId) {
+      ustawIdInstancjiSzczegolow(stanTrasy.szczegolyInstancjiId)
+      if (typeof stanTrasy.szczegolyKopiaId === 'string') {
+        const kopia = pobierzKopieRobocze().find((pozycja) => pozycja.id === stanTrasy.szczegolyKopiaId)
+        if (kopia) ustawAktualnaWersjeRobocza(kopia)
+        else wyczyscAktualnaWersjeRobocza()
+      } else {
+        wyczyscAktualnaWersjeRobocza()
+      }
+      return 0
+    }
+
+    const identyfikatorInstancji = rozpocznijNoweSzczegolyOrganizacyjne()
+    window.history.replaceState({ ...(typeof window.history.state === 'object' && window.history.state ? window.history.state : {}), widok: 'zamkniete_szczegoly_organizacyjne_nowe', szczegolyInstancjiId: identyfikatorInstancji }, '', window.location.href)
   }
   return 0
 }
@@ -194,7 +213,6 @@ function renderujWidok(
   otworzDokument: (dokument: Dokument<unknown, unknown>) => void,
   uzytkownikIdProfilu: string | null,
   wybierzProfil: (uzytkownikId: string) => void,
-  ustawCzyProfilMaNiezapisaneZmiany: (czyMaNiezapisaneZmiany: boolean) => void,
   otworzRekordPulpitu: () => void,
   otworzDokumentyPulpitu: () => void,
   otworzPaczkePulpitu: () => void,
@@ -202,7 +220,7 @@ function renderujWidok(
   if (czyWidokZakupow(widok)) return <WidokZakupow key={widok} widok={widok} ustawWidok={ustawAktywnyWidok} />
   switch (widok) {
     case 'profil_uzytkownika':
-      return <WidokProfiluUzytkownika key={uzytkownikIdProfilu ?? 'wlasny'} ustawCzyMaNiezapisaneZmiany={ustawCzyProfilMaNiezapisaneZmiany} uzytkownikId={uzytkownikIdProfilu} wybierzProfil={wybierzProfil} />
+      return <WidokProfiluUzytkownika key={uzytkownikIdProfilu ?? 'wlasny'} uzytkownikId={uzytkownikIdProfilu} wybierzProfil={wybierzProfil} />
     case 'pulpit':
       return <WidokPulpitu otworzDokument={otworzDokument} otworzDokumenty={otworzDokumentyPulpitu} otworzPaczke={(id, paczkaId) => {
         const checklista = pobierzChecklistePaczki(id)
@@ -217,9 +235,33 @@ function renderujWidok(
     case 'generator-szczegolow':
       return <WidokGeneratoraSzczegolow otworzDokument={otworzDokument} />
     case 'zamkniete_szczegoly_organizacyjne_lista':
-      return <WidokListySzczegolowOrganizacyjnych otworzNoweSzczegoly={() => ustawAktywnyWidok('zamkniete_szczegoly_organizacyjne_nowe', { zachowajKopieSzczegolow: true })} />
+      return <WidokListySzczegolowOrganizacyjnych
+        otworzNoweSzczegoly={() => ustawAktywnyWidok('zamkniete_szczegoly_organizacyjne_nowe')}
+        otworzKopieRobocza={(przygotujKopie) => ustawAktywnyWidok('zamkniete_szczegoly_organizacyjne_nowe', {
+          zachowajKopieSzczegolow: true,
+          przygotujZmiane: () => {
+            const kopia = przygotujKopie()
+            if (!kopia) return false
+            ustawAktualnaWersjeRobocza(kopia)
+            utworzNowaInstancjeSzczegolow()
+            return true
+          },
+        })}
+      />
     case 'zamkniete_szczegoly_organizacyjne_kopie_robocze':
-      return <WidokKopiiRoboczychSzczegolowOrganizacyjnych otworzNoweSzczegoly={() => ustawAktywnyWidok('zamkniete_szczegoly_organizacyjne_nowe', { zachowajKopieSzczegolow: true })} />
+      return <WidokKopiiRoboczychSzczegolowOrganizacyjnych
+        otworzNoweSzczegoly={() => ustawAktywnyWidok('zamkniete_szczegoly_organizacyjne_nowe')}
+        otworzKopieRobocza={(przygotujKopie) => ustawAktywnyWidok('zamkniete_szczegoly_organizacyjne_nowe', {
+          zachowajKopieSzczegolow: true,
+          przygotujZmiane: () => {
+            const kopia = przygotujKopie()
+            if (!kopia) return false
+            ustawAktualnaWersjeRobocza(kopia)
+            utworzNowaInstancjeSzczegolow()
+            return true
+          },
+        })}
+      />
     case 'zamkniete_szczegoly_organizacyjne_nowe':
       return <WidokNowychSzczegolowOrganizacyjnych key={wersjaFormularzaSzczegolow} otworzDokument={otworzDokument} />
     case 'szkolenia-otwarte':
@@ -300,6 +342,36 @@ function renderujWidok(
   }
 }
 
+type ParametryWidokuAplikacji = {
+  widok: WidokNawigacji
+  zmienZakladkeKartotek: Parameters<typeof renderujWidok>[1]
+  ustawAktywnyWidok: Parameters<typeof renderujWidok>[2]
+  wersjaProgramu: number
+  wersjaFormularzaSzczegolow: number
+  otworzDokument: Parameters<typeof renderujWidok>[5]
+  uzytkownikIdProfilu: string | null
+  wybierzProfil: Parameters<typeof renderujWidok>[7]
+  otworzRekordPulpitu: Parameters<typeof renderujWidok>[8]
+  otworzDokumentyPulpitu: Parameters<typeof renderujWidok>[9]
+  otworzPaczkePulpitu: Parameters<typeof renderujWidok>[10]
+}
+
+function WidokAplikacji(props: ParametryWidokuAplikacji) {
+  return renderujWidok(
+    props.widok,
+    props.zmienZakladkeKartotek,
+    props.ustawAktywnyWidok,
+    props.wersjaProgramu,
+    props.wersjaFormularzaSzczegolow,
+    props.otworzDokument,
+    props.uzytkownikIdProfilu,
+    props.wybierzProfil,
+    props.otworzRekordPulpitu,
+    props.otworzDokumentyPulpitu,
+    props.otworzPaczkePulpitu,
+  )
+}
+
 export default function UkladAplikacji() {
   const { wyloguj, zalogowanyUzytkownik } = useKontekstUzytkownika()
   const uzytkownikId = zalogowanyUzytkownik?.id ?? 'anonim'
@@ -334,11 +406,23 @@ export default function UkladAplikacji() {
   const [aktywnyWidok, ustawAktywnyWidok] = useState<WidokNawigacji>(pobierzPoczatkowyWidok)
   const [uzytkownikIdProfilu, ustawUzytkownikIdProfilu] = useState<string | null>(pobierzIdProfiluZeSciezki)
   const [stanMenu, ustawStanMenu] = useState({ czyPrzypiete: false, czyOtwarte: false })
-  const [czyProfilMaNiezapisaneZmiany, ustawCzyProfilMaNiezapisaneZmiany] = useState(false)
-  const [czyWylogowanieDoPotwierdzenia, ustawCzyWylogowanieDoPotwierdzenia] = useState(false)
   const [wersjaProgramu, ustawWersjeProgramu] = useState(0)
   const [wersjaFormularzaSzczegolow, ustawWersjeFormularzaSzczegolow] = useState(pobierzPoczatkowaWersjeFormularzaSzczegolow)
-  const [widokDoPotwierdzenia, ustawWidokDoPotwierdzenia] = useState<WidokNawigacji | null>(null)
+  const [czyOczekujeNaDecyzje, ustawCzyOczekujeNaDecyzje] = useState(false)
+  const [czyWykonywanieDecyzji, ustawCzyWykonywanieDecyzji] = useState(false)
+  const [bladZapisuPrzedNawigacja, ustawBladZapisuPrzedNawigacja] = useState('')
+  const oczekujacaNawigacja = useRef<(() => void | Promise<void>) | null>(null)
+  const czyTrwaDecyzja = useRef(false)
+  const ostatniaSciezkaWidoku = useRef(window.location.pathname)
+  const ostatniStanHistorii = useRef(window.history.state)
+  const pominNastepneZdarzeniePopstate = useRef(false)
+
+  const poprosODecyzjePrzedNawigacja = useCallback((nawiguj: () => void | Promise<void>) => {
+    if (oczekujacaNawigacja.current || czyTrwaDecyzja.current) return
+    oczekujacaNawigacja.current = nawiguj
+    ustawBladZapisuPrzedNawigacja('')
+    ustawCzyOczekujeNaDecyzje(true)
+  }, [])
 
   useEffect(() => {
     function zastosujZapisaneUstawienia() {
@@ -354,6 +438,8 @@ export default function UkladAplikacji() {
   }, [])
 
   function wykonajZmianeWidoku(widok: WidokNawigacji, opcje: OpcjeZmianyWidoku = {}) {
+    if (opcje.przygotujZmiane?.() === false) return
+
     if (widok === 'programy_szkolen' && !opcje.zachowajKopieProgramu) {
       wyczyscAktywnaKopieProgramu()
       ustawWersjeProgramu((obecna) => obecna + 1)
@@ -365,63 +451,85 @@ export default function UkladAplikacji() {
     }
 
     const sciezka = widok === 'profil_uzytkownika' ? opcje.uzytkownikId ? `/profil/${encodeURIComponent(opcje.uzytkownikId)}` : '/profil' : pobierzSciezkeZakupow(widok) ?? pobierzSciezkeNarzedzia(widok) ?? pobierzSciezkeGeneratora(widok) ?? '/'
-
-    if (window.location.pathname !== sciezka) {
-      window.history.pushState({ widok }, '', sciezka)
+    const stanHistorii: { widok: WidokNawigacji; szczegolyInstancjiId?: string; szczegolyKopiaId?: string } = { widok }
+    if (widok === 'zamkniete_szczegoly_organizacyjne_nowe') {
+      stanHistorii.szczegolyInstancjiId = pobierzIdInstancjiSzczegolow()
+      const aktywnaKopiaSzczegolow = pobierzAktualnaWersjeRobocza()
+      if (aktywnaKopiaSzczegolow) stanHistorii.szczegolyKopiaId = aktywnaKopiaSzczegolow.id
     }
 
-    if (widok === 'profil_uzytkownika') ustawUzytkownikIdProfilu(opcje.uzytkownikId ?? null)
+    if (window.location.pathname !== sciezka) {
+      window.history.pushState(stanHistorii, '', sciezka)
+    } else if (widok === 'zamkniete_szczegoly_organizacyjne_nowe') {
+      window.history.replaceState(stanHistorii, '', sciezka)
+    }
+    ostatniStanHistorii.current = stanHistorii
+    ostatniaSciezkaWidoku.current = sciezka
+
+    if (widok === 'profil_uzytkownika') {
+      const obecnyProfilId = uzytkownikIdProfilu ?? zalogowanyUzytkownik?.id ?? null
+      const docelowyProfilId = opcje.uzytkownikId ?? zalogowanyUzytkownik?.id ?? null
+      if (obecnyProfilId !== docelowyProfilId) ustawUzytkownikIdProfilu(opcje.uzytkownikId ?? null)
+    }
     ustawAktywnyWidok(widok)
     if (widok === 'checklisty_paczek') window.dispatchEvent(new PopStateEvent('popstate'))
   }
 
   function ustawWidok(widok: WidokNawigacji, opcje: OpcjeZmianyWidoku = {}) {
+    if (oczekujacaNawigacja.current || czyTrwaDecyzja.current) return
     const czyToNowyProgram = widok === 'programy_szkolen' && !opcje.zachowajKopieProgramu
-    const czyZmianaWymagaPotwierdzenia = widok !== aktywnyWidok || czyToNowyProgram
-    const czyProfilWymagaPotwierdzenia = aktywnyWidok === 'profil_uzytkownika' && czyProfilMaNiezapisaneZmiany
+    const czyToNoweSzczegoly = widok === 'zamkniete_szczegoly_organizacyjne_nowe' && !opcje.zachowajKopieSzczegolow
+    const obecnyProfilId = uzytkownikIdProfilu ?? zalogowanyUzytkownik?.id ?? null
+    const docelowyProfilId = opcje.uzytkownikId ?? zalogowanyUzytkownik?.id ?? null
+    const czyZmianaProfilu = widok === 'profil_uzytkownika' && obecnyProfilId !== docelowyProfilId
+    const czyZmianaWymagaPotwierdzenia = widok !== aktywnyWidok || czyToNowyProgram || czyToNoweSzczegoly || czyZmianaProfilu
 
-    if (!opcje.pomijajOstrzezenie && czyZmianaWymagaPotwierdzenia && (czyProfilWymagaPotwierdzenia || czyDokumentMaNiezapisaneZmiany())) {
-      ustawWidokDoPotwierdzenia(widok)
+    if (!opcje.pomijajOstrzezenie && czyZmianaWymagaPotwierdzenia && (czyDokumentMaNiezapisaneZmiany() || czyTrwaZapisDokumentu())) {
+      poprosODecyzjePrzedNawigacja(() => wykonajZmianeWidoku(widok, opcje))
       return
     }
 
     wykonajZmianeWidoku(widok, opcje)
   }
 
-  function zapiszIWyjdz() {
-    if (!widokDoPotwierdzenia && !czyWylogowanieDoPotwierdzenia) {
+  async function wykonajDecyzjePrzedNawigacja(decyzja: 'zapisz' | 'porzuc') {
+    const nawiguj = oczekujacaNawigacja.current
+    if (!nawiguj || czyTrwaDecyzja.current) return
+    if (czyTrwaZapisDokumentu()) {
+      ustawBladZapisuPrzedNawigacja('Trwa zapis. Poczekaj na jego zakończenie i ponów próbę.')
       return
     }
-
-    if (!zapiszDokumentPrzedWyjsciem()) return
-
-    if (czyWylogowanieDoPotwierdzenia) {
-      ustawCzyWylogowanieDoPotwierdzenia(false)
-      wyloguj()
-      return
+    czyTrwaDecyzja.current = true
+    ustawCzyWykonywanieDecyzji(true)
+    ustawBladZapisuPrzedNawigacja('')
+    try {
+      if (decyzja === 'zapisz') {
+        const zapisano = await zapiszDokumentPrzedWyjsciem()
+        if (!zapisano) {
+          ustawBladZapisuPrzedNawigacja('Nie udało się zapisać wersji roboczej. Dane pozostały w formularzu; ponów zapis albo anuluj przejście.')
+          return
+        }
+      } else {
+        odrzucZmianyDokumentu()
+      }
+      await nawiguj()
+      oczekujacaNawigacja.current = null
+      ustawCzyOczekujeNaDecyzje(false)
+    } catch {
+      ustawBladZapisuPrzedNawigacja('Nie udało się zakończyć przejścia. Możesz ponowić próbę albo anulować.')
+    } finally {
+      czyTrwaDecyzja.current = false
+      ustawCzyWykonywanieDecyzji(false)
     }
-
-    const docelowyWidok = widokDoPotwierdzenia
-    ustawWidokDoPotwierdzenia(null)
-    if (docelowyWidok) wykonajZmianeWidoku(docelowyWidok, { pomijajOstrzezenie: true })
   }
 
-  function wyjdzBezZapisywania() {
-    if (!widokDoPotwierdzenia && !czyWylogowanieDoPotwierdzenia) {
-      return
-    }
-
-    if (czyWylogowanieDoPotwierdzenia) {
-      ustawCzyWylogowanieDoPotwierdzenia(false)
-      ustawCzyProfilMaNiezapisaneZmiany(false)
-      wyloguj()
-      return
-    }
-
-    const docelowyWidok = widokDoPotwierdzenia
-    ustawWidokDoPotwierdzenia(null)
-    if (docelowyWidok) wykonajZmianeWidoku(docelowyWidok, { pomijajOstrzezenie: true })
+  function anulujZmianeWidoku() {
+    if (czyTrwaDecyzja.current) return
+    oczekujacaNawigacja.current = null
+    ustawCzyOczekujeNaDecyzje(false)
+    ustawBladZapisuPrzedNawigacja('')
   }
+
   function zmienZakladkeKartotek(zakladka: ZakladkaKartotek) {
     ustawWidok(pobierzWidokZakladkiKartotek(zakladka))
   }
@@ -429,18 +537,26 @@ export default function UkladAplikacji() {
   const zglosStanMenu = useCallback((stan: { czyPrzypiete: boolean; czyOtwarte: boolean }) => { ustawStanMenu((poprzedni) => poprzedni.czyPrzypiete === stan.czyPrzypiete && poprzedni.czyOtwarte === stan.czyOtwarte ? poprzedni : stan) }, [])
   function otworzProfil(uzytkownikId?: string) { ustawWidok('profil_uzytkownika', { uzytkownikId }) }
   function obsluzWylogowanie() {
-    if (czyProfilMaNiezapisaneZmiany || czyDokumentMaNiezapisaneZmiany()) { ustawCzyWylogowanieDoPotwierdzenia(true); return }
-    wyloguj()
+    if (oczekujacaNawigacja.current || czyTrwaDecyzja.current) return
+    if (czyDokumentMaNiezapisaneZmiany() || czyTrwaZapisDokumentu()) {
+      poprosODecyzjePrzedNawigacja(() => wyloguj())
+      return
+    }
+    czyTrwaDecyzja.current = true
+    void Promise.resolve().then(wyloguj).finally(() => { czyTrwaDecyzja.current = false })
   }
 
-  function otworzDokument(dokument: Dokument<unknown, unknown>) {
+  function wykonajOtwarcieDokumentu(dokument: Dokument<unknown, unknown>) {
     if (dokument.typ === 'PROGRAM_SZKOLENIA') {
       ustawAktywnaKopieProgramu(dokument.id)
       const sciezka = `/dokumenty/programy-szkolen/${encodeURIComponent(dokument.id)}`
 
       if (window.location.pathname !== sciezka) {
-        window.history.pushState({ widok: 'programy_szkolen' }, '', sciezka)
+        const stanTrasy = { widok: 'programy_szkolen' }
+        window.history.pushState(stanTrasy, '', sciezka)
+        ostatniStanHistorii.current = stanTrasy
       }
+      ostatniaSciezkaWidoku.current = sciezka
 
       ustawAktywnyWidok('programy_szkolen')
       return
@@ -453,42 +569,53 @@ export default function UkladAplikacji() {
     if (dokument.typ === 'LISTA_OBECNOSCI' && typeof daneTekstowe === 'string') {
       localStorage.setItem('ultimate-pomagier.listy-obecnosci.szkic', daneTekstowe)
       localStorage.setItem('ultimate-pomagier.listy-obecnosci.szkic.dokumentId', dokument.id)
-      ustawWidok('listy-obecnosci')
+      wykonajZmianeWidoku('listy-obecnosci', { pomijajOstrzezenie: true })
       return
     }
 
     if (dokument.typ === 'ANKIETA' && typeof daneTekstowe === 'string') {
       localStorage.setItem('ultimate-pomagier.ankiety.szkic', daneTekstowe)
       localStorage.setItem('ultimate-pomagier.ankiety.szkic.dokumentId', dokument.id)
-      ustawWidok('ankiety')
+      wykonajZmianeWidoku('ankiety', { pomijajOstrzezenie: true })
       return
     }
 
     if (dokument.typ === 'KARTA_NA_DRZWI' && typeof daneTekstowe === 'string') {
       localStorage.setItem('ultimate-pomagier.karta-na-drzwi.szkic', daneTekstowe)
       localStorage.setItem('ultimate-pomagier.karta-na-drzwi.szkic.dokumentId', dokument.id)
-      ustawWidok('karta-na-drzwi')
+      wykonajZmianeWidoku('karta-na-drzwi', { pomijajOstrzezenie: true })
       return
     }
 
     if (dokument.typ === 'CERTYFIKAT' || dokument.typ === 'ZASWIADCZENIE' || dokument.typ === 'DYPLOM') {
       localStorage.setItem('ultimate-pomagier.dyplomy.generator-pawla', JSON.stringify(dokument.daneDokumentu))
       localStorage.setItem('ultimate-pomagier.dyplomy.generator-pawla.dokumentId', dokument.id)
-      ustawWidok('dyplomy')
+      wykonajZmianeWidoku('dyplomy', { pomijajOstrzezenie: true })
       return
     }
 
     if (dokument.typ === 'LISTA_OBECNOSCI') {
       const sciezka = `/dokumenty/listy-obecnosci/${encodeURIComponent(dokument.id)}`
-      if (window.location.pathname !== sciezka) window.history.pushState({ widok: 'listy-obecnosci' }, '', sciezka)
+      if (window.location.pathname !== sciezka) {
+        const stanTrasy = { widok: 'listy-obecnosci' }
+        window.history.pushState(stanTrasy, '', sciezka)
+        ostatniStanHistorii.current = stanTrasy
+      }
+      ostatniaSciezkaWidoku.current = sciezka
       ustawAktywnyWidok('listy-obecnosci')
       return
     }
 
     if (dokument.typ === 'CHECKLISTA_PACZKI') {
       const sciezka = `/dokumenty/checklisty-paczek/${encodeURIComponent(dokument.id)}`
-      if (window.location.pathname !== sciezka) window.history.pushState({ widok: 'checklisty_paczek' }, '', sciezka)
+      if (window.location.pathname !== sciezka) {
+        const stanTrasy = { widok: 'checklisty_paczek' }
+        window.history.pushState(stanTrasy, '', sciezka)
+        ostatniStanHistorii.current = stanTrasy
+      }
+      ostatniaSciezkaWidoku.current = sciezka
       ustawAktywnyWidok('checklisty_paczek')
+      pominNastepneZdarzeniePopstate.current = true
       window.dispatchEvent(new PopStateEvent('popstate'))
       return
     }
@@ -497,8 +624,17 @@ export default function UkladAplikacji() {
     const widok = sciezka ? pobierzWidokGeneratoraZeSciezki(sciezka) : null
 
     if (widok) {
-      ustawWidok(widok)
+      wykonajZmianeWidoku(widok, { pomijajOstrzezenie: true })
     }
+  }
+
+  function otworzDokument(dokument: Dokument<unknown, unknown>) {
+    if (oczekujacaNawigacja.current || czyTrwaDecyzja.current) return
+    if (czyDokumentMaNiezapisaneZmiany() || czyTrwaZapisDokumentu()) {
+      poprosODecyzjePrzedNawigacja(() => wykonajOtwarcieDokumentu(dokument))
+      return
+    }
+    wykonajOtwarcieDokumentu(dokument)
   }
 
   useEffect(() => {
@@ -510,8 +646,43 @@ export default function UkladAplikacji() {
   }, [aktywnyWidok])
 
   useEffect(() => {
-    function obsluzPowrotPrzegladarki() {
-      const stanHistorii = window.history.state as { widok?: string } | null
+    function zastosujStanTrasySzczegolow(stanTrasy: Record<string, unknown>, sciezka: string) {
+      if (stanTrasy.widok !== 'zamkniete_szczegoly_organizacyjne_nowe') return stanTrasy
+
+      let nowyStanTrasy = stanTrasy
+      let instancjaId = typeof stanTrasy.szczegolyInstancjiId === 'string' ? stanTrasy.szczegolyInstancjiId : ''
+      if (!instancjaId) {
+        instancjaId = rozpocznijNoweSzczegolyOrganizacyjne()
+        nowyStanTrasy = { ...stanTrasy, widok: 'zamkniete_szczegoly_organizacyjne_nowe', szczegolyInstancjiId: instancjaId }
+        window.history.replaceState(nowyStanTrasy, '', sciezka)
+      } else {
+        ustawIdInstancjiSzczegolow(instancjaId)
+      }
+
+      const kopiaId = typeof nowyStanTrasy.szczegolyKopiaId === 'string' ? nowyStanTrasy.szczegolyKopiaId : ''
+      const kopia = kopiaId ? pobierzKopieRobocze().find((pozycja) => pozycja.id === kopiaId) : null
+      if (kopia) {
+        ustawAktualnaWersjeRobocza(kopia)
+      } else {
+        wyczyscAktualnaWersjeRobocza()
+        if (kopiaId) {
+          const stanBezUsunietejKopii = { ...nowyStanTrasy }
+          delete stanBezUsunietejKopii.szczegolyKopiaId
+          nowyStanTrasy = stanBezUsunietejKopii
+          window.history.replaceState(nowyStanTrasy, '', sciezka)
+        }
+      }
+
+      return nowyStanTrasy
+    }
+
+    function obsluzPowrotPrzegladarki(zdarzenie: PopStateEvent) {
+      if (pominNastepneZdarzeniePopstate.current) {
+        pominNastepneZdarzeniePopstate.current = false
+        return
+      }
+      const stanObecnejHistorii = window.history.state && typeof window.history.state === 'object' ? window.history.state as Record<string, unknown> : {}
+      const stanHistorii = stanObecnejHistorii as { widok?: string; szczegolyInstancjiId?: unknown; szczegolyKopiaId?: unknown }
       const widokZeSciezki = /^\/profil(?:\/[^/]+)?$/.test(window.location.pathname) ? 'profil_uzytkownika' : pobierzWidokZakupowZeSciezki(window.location.pathname) ?? pobierzWidokNarzedziaZeSciezki(window.location.pathname) ?? pobierzWidokGeneratoraZeSciezki(window.location.pathname)
       const widok = widokZeSciezki ?? stanHistorii?.widok
       const poprawnyWidok = widok ?? null
@@ -520,24 +691,96 @@ export default function UkladAplikacji() {
         return
       }
 
-      if (poprawnyWidok !== aktywnyWidok && (czyDokumentMaNiezapisaneZmiany() || czyProfilMaNiezapisaneZmiany)) {
-        const sciezkaBiezacegoWidoku = pobierzSciezkeZakupow(aktywnyWidok) ?? pobierzSciezkeNarzedzia(aktywnyWidok) ?? pobierzSciezkeGeneratora(aktywnyWidok) ?? '/'
-        window.history.pushState({ widok: aktywnyWidok }, '', sciezkaBiezacegoWidoku)
-        ustawWidokDoPotwierdzenia(poprawnyWidok)
+      const sciezkaDocelowa = window.location.pathname
+      const czyZmianaInstancjiSzczegolow = poprawnyWidok === 'zamkniete_szczegoly_organizacyjne_nowe'
+        && (typeof stanHistorii.szczegolyInstancjiId !== 'string' || stanHistorii.szczegolyInstancjiId !== pobierzIdInstancjiSzczegolow())
+      const czyZmianaTrasy = poprawnyWidok !== aktywnyWidok || sciezkaDocelowa !== ostatniaSciezkaWidoku.current || czyZmianaInstancjiSzczegolow
+      if (czyZmianaTrasy && (oczekujacaNawigacja.current || czyTrwaDecyzja.current || czyDokumentMaNiezapisaneZmiany() || czyTrwaZapisDokumentu())) {
+        zdarzenie.stopImmediatePropagation()
+        const sciezkaBiezacegoWidoku = ostatniaSciezkaWidoku.current
+        const stanBiezacegoWidoku: Record<string, unknown> = {
+          ...(ostatniStanHistorii.current && typeof ostatniStanHistorii.current === 'object' ? ostatniStanHistorii.current : {}),
+          widok: aktywnyWidok,
+        }
+        if (aktywnyWidok === 'zamkniete_szczegoly_organizacyjne_nowe') {
+          stanBiezacegoWidoku.szczegolyInstancjiId = pobierzIdInstancjiSzczegolow()
+          const aktywnaKopiaSzczegolow = pobierzAktualnaWersjeRobocza()
+          if (aktywnaKopiaSzczegolow) stanBiezacegoWidoku.szczegolyKopiaId = aktywnaKopiaSzczegolow.id
+          else delete stanBiezacegoWidoku.szczegolyKopiaId
+        }
+        ostatniStanHistorii.current = stanBiezacegoWidoku
+        window.history.pushState(stanBiezacegoWidoku, '', sciezkaBiezacegoWidoku)
+        poprosODecyzjePrzedNawigacja(() => {
+          window.history.pushState(stanHistorii, '', sciezkaDocelowa)
+          const zastosowanyStan = zastosujStanTrasySzczegolow(stanHistorii, sciezkaDocelowa)
+          ostatniStanHistorii.current = zastosowanyStan
+          ostatniaSciezkaWidoku.current = sciezkaDocelowa
+          if (poprawnyWidok === 'zamkniete_szczegoly_organizacyjne_nowe') ustawWersjeFormularzaSzczegolow((obecna) => obecna + 1)
+          if (poprawnyWidok === 'profil_uzytkownika') ustawUzytkownikIdProfilu(pobierzIdProfiluZeSciezki())
+          ustawAktywnyWidok(poprawnyWidok)
+        })
         return
       }
 
+      const zastosowanyStan = zastosujStanTrasySzczegolow(stanHistorii, sciezkaDocelowa)
+      ostatniStanHistorii.current = zastosowanyStan
+      if (czyZmianaInstancjiSzczegolow) ustawWersjeFormularzaSzczegolow((obecna) => obecna + 1)
       if (poprawnyWidok === 'profil_uzytkownika') ustawUzytkownikIdProfilu(pobierzIdProfiluZeSciezki())
+      ostatniaSciezkaWidoku.current = sciezkaDocelowa
       ustawAktywnyWidok(poprawnyWidok)
     }
 
-    window.addEventListener('popstate', obsluzPowrotPrzegladarki)
+    window.addEventListener('popstate', obsluzPowrotPrzegladarki, true)
 
-    return () => window.removeEventListener('popstate', obsluzPowrotPrzegladarki)
-  }, [aktywnyWidok, czyProfilMaNiezapisaneZmiany])
+    return () => window.removeEventListener('popstate', obsluzPowrotPrzegladarki, true)
+  }, [aktywnyWidok, poprosODecyzjePrzedNawigacja])
+
+  useEffect(() => {
+    if (!isTauri()) return
+
+    const okno = getCurrentWindow()
+    let czyEfektAktywny = true
+    let czyZamykanieOkna = false
+    let odlaczObsluge: (() => void) | null = null
+    async function zamknijOkno() {
+      czyZamykanieOkna = true
+      try {
+        await okno.destroy()
+      } catch (blad) {
+        czyZamykanieOkna = false
+        throw blad
+      }
+    }
+    function odlaczBezpiecznie(odlacz: () => void) {
+      void Promise.resolve().then(odlacz).catch((blad: unknown) => {
+        console.error('Nie udało się odłączyć ochrony przy zamknięciu okna.', blad)
+      })
+    }
+    void okno.onCloseRequested((zdarzenie) => {
+      zdarzenie.preventDefault()
+      if (!czyEfektAktywny || czyZamykanieOkna || oczekujacaNawigacja.current || czyTrwaDecyzja.current) return
+      if (czyDokumentMaNiezapisaneZmiany() || czyTrwaZapisDokumentu()) {
+        poprosODecyzjePrzedNawigacja(zamknijOkno)
+      } else {
+        void zamknijOkno().catch((blad: unknown) => {
+          console.error('Nie udało się zamknąć okna.', blad)
+        })
+      }
+    }).then((odlacz) => {
+      if (czyEfektAktywny) odlaczObsluge = odlacz
+      else odlaczBezpiecznie(odlacz)
+    }).catch((blad: unknown) => {
+      console.error('Nie udało się podłączyć ochrony zmian przy zamknięciu okna.', blad)
+    })
+
+    return () => {
+      czyEfektAktywny = false
+      if (odlaczObsluge) odlaczBezpiecznie(odlaczObsluge)
+    }
+  }, [poprosODecyzjePrzedNawigacja])
 
   const nazwaGeneratora = konfiguracjePodmenuGeneratorow.find((konfiguracja) => konfiguracja.pozycje[0]?.widok === aktywnyWidok)?.etykieta
-  const widok = renderujWidok(aktywnyWidok, zmienZakladkeKartotek, ustawWidok, wersjaProgramu, wersjaFormularzaSzczegolow, otworzDokument, uzytkownikIdProfilu, (uzytkownikId) => otworzProfil(uzytkownikId), ustawCzyProfilMaNiezapisaneZmiany, () => ustawWidok('zamkniete_szczegoly_organizacyjne_lista'), () => ustawWidok('dokumenty_wszystkie'), () => ustawWidok('checklisty_paczek'))
+  const widok = <WidokAplikacji widok={aktywnyWidok} zmienZakladkeKartotek={zmienZakladkeKartotek} ustawAktywnyWidok={ustawWidok} wersjaProgramu={wersjaProgramu} wersjaFormularzaSzczegolow={wersjaFormularzaSzczegolow} otworzDokument={otworzDokument} uzytkownikIdProfilu={uzytkownikIdProfilu} wybierzProfil={otworzProfil} otworzRekordPulpitu={() => ustawWidok('zamkniete_szczegoly_organizacyjne_lista')} otworzDokumentyPulpitu={() => ustawWidok('dokumenty_wszystkie')} otworzPaczkePulpitu={() => ustawWidok('checklisty_paczek')} />
   return (
     <div ref={powloka} className={`uklad-aplikacji${stanMenu.czyPrzypiete && stanMenu.czyOtwarte ? ' uklad-aplikacji--menu-przypiete' : ''}`}>
       <a className="powloka__pomin" href="#obszar-roboczy">Przejdź do treści</a>
@@ -549,12 +792,14 @@ export default function UkladAplikacji() {
         {czyDockWidoczny && <DockAplikacji skroty={preferencjePowloki.skroty} aktywnyWidok={aktywnyWidok} ustawWidok={ustawWidok} edytuj={() => ustawCzyEdytujeDock(true)} ukryj={() => zmienPreferencjePowloki({ widocznyDock: false })} />}
       </div>
       <OknoDialogowe otwarty={czyEdytujeDock} zamknij={() => ustawCzyEdytujeDock(false)} tytul="Skróty docka"><p>Wybierz widoki dostępne na dolnym pasku.</p><div className="dock-aplikacji__wybor">{pobierzDostepneSkroty().map(({ widok, opis }) => <label key={widok}><input type="checkbox" checked={preferencjePowloki.skroty.includes(widok)} onChange={(zdarzenie) => zmienPreferencjePowloki({ skroty: zdarzenie.target.checked ? [...preferencjePowloki.skroty, widok] : preferencjePowloki.skroty.filter((skrot) => skrot !== widok) })} />{opis}</label>)}</div>{bladPreferencji && <Komunikat status="error">{bladPreferencji}</Komunikat>}</OknoDialogowe>
-      {(widokDoPotwierdzenia || czyWylogowanieDoPotwierdzenia) && (
-        <OknoDialogowe otwarty zamknij={() => { ustawWidokDoPotwierdzenia(null); ustawCzyWylogowanieDoPotwierdzenia(false) }} tytul="Niezapisane zmiany" etykietaZamkniecia="Wróć do edycji">
-          <strong>Masz niezapisane zmiany {aktywnyWidok === 'profil_uzytkownika' ? 'profilu' : 'dokumentu'}.</strong>
-          <div className="program-szkolen__akcje">
-            {!czyWylogowanieDoPotwierdzenia && aktywnyWidok !== 'profil_uzytkownika' && <Przycisk onClick={zapiszIWyjdz}>Zapisz i kontynuuj</Przycisk>}
-            <Przycisk onClick={wyjdzBezZapisywania}>Odrzuć zmiany</Przycisk>
+      {czyOczekujeNaDecyzje && (
+        <OknoDialogowe otwarty zamknij={anulujZmianeWidoku} tytul="Masz niezapisane zmiany" etykietaZamkniecia="ANULUJ" klasa="uklad-aplikacji__dialog-zmian" opisId="uklad-aplikacji__opis-zmian">
+          <p id="uklad-aplikacji__opis-zmian">Wprowadzone zmiany nie zostały zapisane. Co chcesz zrobić?</p>
+          {czyWykonywanieDecyzji && <p role="status">Trwa przygotowanie do przejścia…</p>}
+          {bladZapisuPrzedNawigacja && <Komunikat status="error">{bladZapisuPrzedNawigacja}</Komunikat>}
+          <div className="uklad-aplikacji__decyzje-zmian">
+            <Przycisk disabled={czyWykonywanieDecyzji} onClick={() => void wykonajDecyzjePrzedNawigacja('zapisz')}>ZAPISZ I PRZEJDŹ</Przycisk>
+            <button className="uklad-aplikacji__porzuc-zmiany" disabled={czyWykonywanieDecyzji} type="button" onClick={() => void wykonajDecyzjePrzedNawigacja('porzuc')}>PORZUĆ ZMIANY</button>
           </div>
         </OknoDialogowe>
       )}
