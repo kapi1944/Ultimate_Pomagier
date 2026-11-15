@@ -115,7 +115,7 @@ jobs:
           retention-days: 30
 
   odbior-migracji:
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/testy/odbior-windows-4.1.0' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/testy/odbior-windows-4.1.0' && inputs.kanal == 'stabilny' }}
     runs-on: windows-2022
     timeout-minutes: 18
     permissions:
@@ -143,3 +143,45 @@ jobs:
           path: tmp/odbior-windows/4.1.0
           merge-multiple: true
       - run: node --test testy/aktualizacjaWindows.natywna.test.mjs
+
+  odbior-android:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/testy/odbior-windows-4.1.0' && inputs.kanal == 'testowy' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '12266719'
+          packages: 'platform-tools emulator'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 40482903555
+          name: Ultimate-Pomagier-Android
+          path: tmp/odbior-android/4.0.0
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 43713741684
+          name: Ultimate-Pomagier-Android
+          path: tmp/odbior-android/4.1.0
+      - name: Uruchom odizolowany emulator
+        run: |
+          sudo chown "$(id -u)" /dev/kvm
+          sdkmanager 'system-images;android-34;google_apis;x86_64'
+          avdmanager create avd --name odbior-410 --package 'system-images;android-34;google_apis;x86_64' --device pixel_6 <<< no
+          nohup "$ANDROID_HOME/emulator/emulator" -avd odbior-410 -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator-odbior-410.log" 2>&1 &
+          timeout 300 bash -c 'adb wait-for-device; until [[ "$(adb shell getprop sys.boot_completed | tr -d "\r")" == 1 ]]; do sleep 2; done'
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb shell ime disable com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME || true
+      - run: python testy/aktualizacjaAndroid.natywna.py
+      - name: Diagnostyka emulatora
+        if: failure()
+        run: |
+          if [[ -f "$RUNNER_TEMP/emulator-odbior-410.log" ]]; then tail -60 "$RUNNER_TEMP/emulator-odbior-410.log"; fi
+          adb shell getprop ro.product.cpu.abilist || true
