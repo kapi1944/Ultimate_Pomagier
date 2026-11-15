@@ -104,8 +104,16 @@ fn zabezpiecz_haslo(haslo: &str, powtorzone: &str) -> Result<String, String> {
     if haslo != powtorzone {
         return Err("Podane hasła są różne.".into());
     }
-    if haslo.chars().count() < 8 || haslo.len() > 1024 || haslo.chars().any(|znak| znak.is_whitespace() || znak == '\u{feff}') {
-        return Err("Minimum 8 znaków, bez spacji. Polskie znaki są dozwolone. Maksymalnie 1024 bajty.".into());
+    if haslo.chars().count() < 8
+        || haslo.len() > 1024
+        || haslo
+            .chars()
+            .any(|znak| znak.is_whitespace() || znak == '\u{feff}')
+    {
+        return Err(
+            "Minimum 8 znaków, bez spacji. Polskie znaki są dozwolone. Maksymalnie 1024 bajty."
+                .into(),
+        );
     }
     Argon2::default()
         .hash_password(haslo.as_bytes(), &SaltString::generate(&mut OsRng))
@@ -744,7 +752,12 @@ fn wykonaj_operacje(
             if haslo != tekst(dane, "powtorzoneHaslo") {
                 return Err("Podane hasła są różne.".into());
             }
-            if haslo.chars().count() < 8 || haslo.len() > 1024 || haslo.chars().any(|znak| znak.is_whitespace() || znak == '\u{feff}') {
+            if haslo.chars().count() < 8
+                || haslo.len() > 1024
+                || haslo
+                    .chars()
+                    .any(|znak| znak.is_whitespace() || znak == '\u{feff}')
+            {
                 return Err("Minimum 8 znaków, bez spacji. Polskie znaki są dozwolone. Maksymalnie 1024 bajty.".into());
             }
             let stare: Option<String> = baza

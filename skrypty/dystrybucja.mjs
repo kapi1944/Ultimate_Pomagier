@@ -38,6 +38,7 @@ export async function przygotujWeb() {
   const sciezka = join(katalog, `Ultimate_Pomagier_${informacje.wersja}_WEB.zip`)
   await writeFile(sciezka, zipSync(pliki))
   const plik = await opiszPlik(sciezka, { platforma: 'web', architektura: 'uniwersalna', typ: 'zip', podpis: { rodzaj: 'sha256' } })
+  await writeFile(`${sciezka}.sha256`, `${plik.sha256}  ${plik.nazwa}\n`)
   await writeFile(join(katalog, 'wydanie-web.json'), JSON.stringify({ wersja: informacje.wersja, commit: informacje.commit, pliki: [plik] }, null, 2))
 }
 

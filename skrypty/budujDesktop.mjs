@@ -8,8 +8,8 @@ import { sprawdzKonfiguracjeDesktop, sprawdzFrontendDesktop } from './kontrolaTr
 import { opiszPlik } from './dystrybucja.mjs'
 
 const katalog = fileURLToPath(new URL('../', import.meta.url))
-export const adresStabilnegoWydania = 'https://github.com/kapi1944/Ultimate_Pomagier_3_5/releases/latest/download/latest.json'
-export const adresKanalowWydan = 'https://github.com/kapi1944/Ultimate_Pomagier_3_5/releases/download/windows-aktualizacje/{{target}}.json'
+export const adresStabilnegoWydania = 'https://github.com/kapi1944/Ultimate_Pomagier/releases/latest/download/latest.json'
+export const adresKanalowWydan = 'https://github.com/kapi1944/Ultimate_Pomagier/releases/download/windows-aktualizacje/{{target}}.json'
 
 export function przygotujKonfiguracjeWydania(pakiet, konfiguracja, { podpisane, tag, czysteZrodla, kluczPubliczny, kluczPrywatny, kanal = 'stabilny' }) {
   sprawdzKonfiguracjeDesktop(konfiguracja)
@@ -92,7 +92,7 @@ async function buduj() {
       pub_date: new Date().toISOString(),
       platforms: { 'windows-x86_64': {
         signature: podpis,
-        url: `https://github.com/kapi1944/Ultimate_Pomagier_3_5/releases/download/v${pakiet.version}/${nazwa}`,
+        url: `https://github.com/kapi1944/Ultimate_Pomagier/releases/download/v${pakiet.version}/${nazwa}`,
       } },
     }
     await writeFile(join(katalogArtefaktow, 'latest.json'), JSON.stringify(manifestAktualizacji, null, 2))

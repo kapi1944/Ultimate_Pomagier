@@ -19,7 +19,7 @@ function Wywolaj-Git([string[]]$argumenty) {
     switch ($tekst) {
         'rev-parse --show-toplevel' { return $katalogProjektu }
         'status --porcelain --untracked-files=all --ignore-submodules=none' { return $script:zmiany }
-        'remote get-url origin' { return 'https://github.com/kapi1944/Ultimate_Pomagier_3_5.git' }
+        'remote get-url origin' { return 'https://github.com/kapi1944/Ultimate_Pomagier.git' }
         'rev-parse HEAD' { if ($script:czyScalono) { return 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }; return 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' }
         'rev-parse origin/main' { return 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' }
         'rev-list --left-right --count HEAD...origin/main' { return $script:liczniki }

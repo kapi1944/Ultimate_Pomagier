@@ -9,6 +9,7 @@ import { sprawdzSzkicPublikacji, pobierzSzkicWydania } from '../skrypty/zatwierd
 
 test('versionCode wzrasta i nie dopuszcza kolizji ani przekroczenia zakresu', () => {
   assert.equal(numerWersjiAndroid('4.0.0'), 4000000)
+  assert.equal(numerWersjiAndroid('4.1.0'), 4001000)
   assert.ok(numerWersjiAndroid('4.0.1') > numerWersjiAndroid('4.0.0'))
   assert.ok(numerWersjiAndroid('4.1.0') > numerWersjiAndroid('4.0.999'))
   for (const wersja of ['4.0.0-rc.1', '04.0.0', '4.0.1000', '4.1000.0', '0.0.0', '2101.0.0']) assert.throws(() => numerWersjiAndroid(wersja))
@@ -94,7 +95,7 @@ test('APK wymaga kompletu bibliotek właściwej architektury i segmentów ELF zg
 })
 
 test('odczyt prywatnego szkicu działa, gdy endpoint opublikowanego wydania po tagu zwraca 404', () => {
-  const repozytorium = 'kapi1944/Ultimate_Pomagier_3_5'
+  const repozytorium = 'kapi1944/Ultimate_Pomagier'
   const szkic = { id: 123, tag_name: 'v4.0.0', draft: true }
   const wywolania = []
   function wykonaj(program, argumenty) {
@@ -129,7 +130,7 @@ test('manifest powstaje z rzeczywistych trzech plików i odrzuca uszkodzenie lub
   const manifest = await polaczMetadane(katalog, join(katalog, 'zmiany.md'))
   assert.equal(manifest.pliki.length, 3)
   assert.match(await readFile(join(katalog, 'opis-wydania.md'), 'utf8'), /```pomagier-wydanie/)
-  const repozytorium = 'kapi1944/Ultimate_Pomagier_3_5'
+  const repozytorium = 'kapi1944/Ultimate_Pomagier'
   const assets = manifest.pliki.map((plik) => ({ name: plik.nazwa, state: 'uploaded', size: plik.rozmiar, digest: `sha256:${plik.sha256}`, browser_download_url: `https://github.com/${repozytorium}/releases/download/v4.0.0/${plik.nazwa}` }))
   assets.push({ name: 'plik.exe.sig', state: 'uploaded', size: 10, digest: `sha256:${manifest.pliki.find((plik) => plik.platforma === 'windows').podpis.sha256}` }, { name: 'latest.json', state: 'uploaded', size: 100 })
   const szkic = { draft: true, prerelease: false, tag_name: 'v4.0.0', assets, body: await readFile(join(katalog, 'opis-wydania.md'), 'utf8') }

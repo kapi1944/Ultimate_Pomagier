@@ -1,6 +1,6 @@
 import { czyNowszaWersjaStabilna } from './aktualizacjeDesktop'
 
-export const repozytoriumWydan = 'kapi1944/Ultimate_Pomagier_3_5'
+export const repozytoriumWydan = 'kapi1944/Ultimate_Pomagier'
 const adresApi = `https://api.github.com/repos/${repozytoriumWydan}/releases`
 const wzorzecWersji = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/
 export type PlatformaWydania = 'windows' | 'android' | 'web' | 'linux' | 'macos' | 'ios'

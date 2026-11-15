@@ -7,14 +7,23 @@ const NOWE: &str = "zażółćgę";
 #[test]
 fn walidacja_nowych_hasel() {
     for (haslo, poprawne) in [
-        ("abcdefg".to_string(), false), ("abcdefgh".to_string(), true),
-        ("abcdefghij".to_string(), true), ("abcd efgh".to_string(), false),
-        (" abcdefgh".to_string(), false), ("abcdefgh ".to_string(), false),
-        ("zażółćgę".to_string(), true), ("😀".repeat(7), false), ("😀".repeat(8), true),
-        ("a".repeat(1024), true), ("a".repeat(1025), false),
-        ("ą".repeat(512), true), ("ą".repeat(513), false),
-        ("abcd\tefgh".to_string(), false), ("abcd\nefgh".to_string(), false),
-        ("abcd\u{0085}efgh".to_string(), false), ("abcd\u{feff}efgh".to_string(), false),
+        ("abcdefg".to_string(), false),
+        ("abcdefgh".to_string(), true),
+        ("abcdefghij".to_string(), true),
+        ("abcd efgh".to_string(), false),
+        (" abcdefgh".to_string(), false),
+        ("abcdefgh ".to_string(), false),
+        ("zażółćgę".to_string(), true),
+        ("😀".repeat(7), false),
+        ("😀".repeat(8), true),
+        ("a".repeat(1024), true),
+        ("a".repeat(1025), false),
+        ("ą".repeat(512), true),
+        ("ą".repeat(513), false),
+        ("abcd\tefgh".to_string(), false),
+        ("abcd\nefgh".to_string(), false),
+        ("abcd\u{0085}efgh".to_string(), false),
+        ("abcd\u{feff}efgh".to_string(), false),
     ] {
         assert_eq!(zabezpiecz_haslo(&haslo, &haslo).is_ok(), poprawne);
     }

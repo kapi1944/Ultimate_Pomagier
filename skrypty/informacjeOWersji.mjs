@@ -19,7 +19,7 @@ export function pobierzInformacjeOWersji() {
     if (statSync(sciezka).isFile()) skrotZrodel.update(plik.replaceAll('\\', '/')).update('\0').update(readFileSync(sciezka))
   }
   return {
-    nazwaProduktu: `Ultimate Pomagier ${pakiet.version.split('.').slice(0, 2).join('.')}`,
+    nazwaProduktu: `Ultimate Pomagier ${pakiet.version}`,
     wersja: pakiet.version,
     numerKompilacji: process.env.GITHUB_RUN_NUMBER || git('rev-list', '--count', 'HEAD'),
     kanal,

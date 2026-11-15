@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { spawn } from 'node:child_process'
 import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
+import { numerWersjiAndroid } from '../skrypty/dystrybucja.mjs'
 
 const wymagaj = createRequire(import.meta.url)
 const { chromium } = wymagaj(process.env.POMAGIER_PLAYWRIGHT || 'playwright')
@@ -13,9 +14,9 @@ function wydanie(wersja, platforma, identyfikator) {
   const typ = platforma === 'android' ? 'apk' : 'exe'
   const nazwa = `Pomagier_${wersja}.${typ}`
   const manifest = { schemat: 1, wersja, commit: 'b'.repeat(40), kanal: 'stabilna', pliki: [{ platforma, architektura: 'aarch64', typ, nazwa, rozmiar: 100,
-    sha256: suma, identyfikator: 'pl.ultimatepomagier.desktop', versionCode: 4000001,
+    sha256: suma, identyfikator: 'pl.ultimatepomagier.desktop', versionCode: numerWersjiAndroid(wersja),
     podpis: platforma === 'android' ? { rodzaj: 'android', certyfikatSha256: 'c'.repeat(64) } : { rodzaj: 'tauri', sha256: suma } }] }
-  const plik = { name: nazwa, size: 100, state: 'uploaded', digest: `sha256:${suma}`, browser_download_url: `https://github.com/kapi1944/Ultimate_Pomagier_3_5/releases/download/v${wersja}/${nazwa}` }
+  const plik = { name: nazwa, size: 100, state: 'uploaded', digest: `sha256:${suma}`, browser_download_url: `https://github.com/kapi1944/Ultimate_Pomagier/releases/download/v${wersja}/${nazwa}` }
   return { id: identyfikator, draft: false, prerelease: false, tag_name: `v${wersja}`, published_at: '2026-10-25T10:00:00Z', body: `Zmiany wydania ${wersja}.\n\n\`\`\`pomagier-wydanie\n${JSON.stringify(manifest)}\n\`\`\``, assets: [plik, ...(platforma === 'windows' ? [{ name: `${nazwa}.sig`, state: 'uploaded', size: 500, digest: `sha256:${suma}` }] : [])] }
 }
 
@@ -35,12 +36,13 @@ test('centrum wersji w prawdziwej przeglądarce: telefon, Windows, historia, pob
     const bledy = []
     strona.on('pageerror', (blad) => bledy.push(blad.message))
     let wycofane = false
-    const wydania = [wydanie('4.0.1', 'android', 1), wydanie('4.0.0', 'android', 2), wydanie('4.0.1', 'windows', 3)]
-    await strona.route('https://api.github.com/repos/kapi1944/Ultimate_Pomagier_3_5/releases**', async (trasa) => {
+    const obecna = wymagaj('../package.json').version
+    const wydania = [wydanie(obecna, 'android', 1), wydanie('4.0.0', 'android', 2), wydanie(obecna, 'windows', 3)]
+    await strona.route('https://api.github.com/repos/kapi1944/Ultimate_Pomagier/releases**', async (trasa) => {
       const numer = /releases\/(\d+)$/.exec(trasa.request().url())?.[1]
       await trasa.fulfill({ json: numer ? { ...wydania.find((element) => element.id === Number(numer)), ...(wycofane ? { draft: true } : {}) } : wydania })
     })
-    await strona.route('https://github.com/kapi1944/Ultimate_Pomagier_3_5/releases/download/**', (trasa) => trasa.fulfill({ body: 'artefakt testowy przeglądarki', headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="test.apk"' } }))
+    await strona.route('https://github.com/kapi1944/Ultimate_Pomagier/releases/download/**', (trasa) => trasa.fulfill({ body: 'artefakt testowy przeglądarki', headers: { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="test.apk"' } }))
     await strona.goto(adres)
     await strona.getByRole('button', { name: 'Pobierz aplikację — aktualizacje i wersje' }).click()
     const okno = strona.getByRole('dialog')

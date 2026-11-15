@@ -84,6 +84,12 @@ test('podpisany build odrzuca brak kluczy, zły klucz, rozjazd wersji i źródł
   const testowy = przygotujKonfiguracjeWydania(pakiet, konfiguracja, { ...opcje, kanal: 'testowy' })
   assert.equal(testowy.plugins.updater.pubkey, kluczPubliczny)
   assert.equal(testowy.plugins.updater.requireSignedVersion, true)
+  assert.deepEqual(testowy.plugins.updater.endpoints, wynik.plugins.updater.endpoints)
+  const adresWydan = 'https://github.com/kapi1944/Ultimate_Pomagier/releases'
+  assert.deepEqual(konfiguracja.plugins.updater.endpoints, [`${adresWydan}/latest/download/latest.json`])
+  assert.equal(adresKanalowWydan, `${adresWydan}/download/windows-aktualizacje/{{target}}.json`)
+  const dystrybucja = odczytaj('src-tauri/capabilities/dystrybucja.json')
+  assert.deepEqual(dystrybucja.permissions, [{ identifier: 'opener:allow-open-url', allow: [{ url: `${adresWydan}/download/*` }] }])
   assert.equal(waliduj({ ...konfiguracja, bundle: { ...konfiguracja.bundle, ...wynik.bundle }, plugins: wynik.plugins }), true, JSON.stringify(waliduj.errors))
 })
 
