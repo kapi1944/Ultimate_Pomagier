@@ -1,6 +1,7 @@
 from pathlib import Path
 import os
 import re
+import shlex
 import subprocess
 import time
 from xml.etree import ElementTree
@@ -76,6 +77,28 @@ def otworz():
     assert "Status: ok" in adb("shell", "am", "start", "-W", "-n", dzialanie)
 
 
+def sprawdz_eksport_pdf():
+    for nazwa in ("Otwórz menu", "Dokumenty", "Karta na drzwi", "Nowa karta na drzwi"):
+        kliknij(po_tekscie(nazwa))
+    po_tekscie("Zestaw i karta")
+    kliknij(po_tekscie("PDF wybranej karty"))
+    for _ in range(15):
+        pliki = adb("shell", "ls", "-1", "/sdcard/Download").splitlines()
+        for nazwa in pliki:
+            if nazwa.lower().endswith(".pdf"):
+                sciezka = shlex.quote(f"/sdcard/Download/{nazwa}")
+                assert adb("shell", f"head -c 5 {sciezka}") == "%PDF-"
+                print("Karty na drzwi: zapisano rzeczywisty plik PDF.", flush=True)
+                return
+        elementy = ekran()
+        if any("Krótka nazwa pliku" in etykiety(e) for e in elementy):
+            kliknij(po_tekscie("Krótka nazwa pliku"))
+            adb("shell", "input", "text", "KartaOdbior410")
+            kliknij(po_tekscie("Pobierz PDF"))
+        time.sleep(1)
+    raise RuntimeError("Brak wyeksportowanego PDF w katalogu Download")
+
+
 assert os.environ.get("GITHUB_ACTIONS") == "true"
 assert "arm64-v8a" in adb("shell", "getprop", "ro.product.cpu.abilist").split(",")
 instaluj("4.0.0", 4000000)
@@ -98,4 +121,6 @@ for proba in range(2):
     kliknij(po_tekscie("Zaloguj"))
     po_tekscie("Pulpit")
     print(f"Android 4.1.0, uruchomienie {proba + 1}: zachowane konto i zapamiętany login.", flush=True)
+    if proba == 1:
+        sprawdz_eksport_pdf()
     adb("shell", "am", "force-stop", PAKIET)
