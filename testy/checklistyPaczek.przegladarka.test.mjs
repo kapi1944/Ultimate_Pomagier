@@ -109,6 +109,19 @@ test('ergonomia checklist: tabela, klawiatura, przeciąganie, korekty i macierz 
             szerokosc: element.clientWidth, przewijanie: element.scrollWidth,
             szerokoscStrony: document.documentElement.clientWidth, przewijanieStrony: document.documentElement.scrollWidth,
           }))
+          if (geometria.przewijanie > geometria.szerokosc + 2) {
+            geometria.przekroczenia = await strona.locator('.checklista-paczki').evaluate((modul) => {
+              const prawa = modul.getBoundingClientRect().right
+              return [...modul.querySelectorAll('*')].filter((element) => {
+                const prostokat = element.getBoundingClientRect()
+                return prostokat.width > 0 && prostokat.right > prawa + 2 &&
+                  !element.closest('.generator-panel-ustawien, .paczki-podglad__przewijanie')
+              }).slice(0, 12).map((element) => ({
+                znacznik: element.tagName, klasa: element.getAttribute('class'),
+                typ: element.getAttribute('type'), nadmiar: Math.round(element.getBoundingClientRect().right - prawa),
+              }))
+            })
+          }
           assert.ok(geometria.przewijanie <= geometria.szerokosc + 2, `${etap}: ${szerokosc}px, ${skala}% — przepełnienie modułu ${JSON.stringify(geometria)}`)
           if (etap === 'edycja') {
             geometria.tabele = await strona.locator('.checklista-paczki__kontener-tabeli').evaluateAll((kontenery) => kontenery.map((kontener) => {

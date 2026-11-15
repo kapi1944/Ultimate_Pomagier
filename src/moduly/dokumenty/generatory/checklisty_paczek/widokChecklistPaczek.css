@@ -443,6 +443,12 @@
 }
 
 @container (max-width: 300px) {
+  .checklista-paczki__naglowek-pracy :is(.generator-dokumentu__akcje, .checklista-paczki__tryby),
+  .checklista-paczki :is(button, summary, legend) { min-width: 0; max-width: 100%; }
+  .checklista-paczki :is(button, summary, legend, label, h1, h2, h3, p, .generator-dokumentu__status-zapisu) {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
   .checklista-paczki__pozycja-kompletowania { grid-template-columns: minmax(0, 1fr); }
   .checklista-paczki__pozycja-kompletowania > * { grid-area: auto; }
 }
