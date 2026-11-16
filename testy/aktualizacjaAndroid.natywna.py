@@ -98,6 +98,13 @@ def sprawdz_eksport_pdf():
     zastane = pliki_pdf()
     kliknij(po_tekscie("PDF wybranej karty"))
 
+    def czy_przycisk_zapisu(element):
+        identyfikator = element.get("resource-id", "")
+        return (element.get("package", "").endswith(".documentsui")
+                and element.get("clickable") == "true"
+                and element.get("enabled") == "true"
+                and (identyfikator == "android:id/button1" or identyfikator.endswith(":id/action_menu_save")))
+
     def znajdz_akcje(elementy):
         for element in elementy:
             opis = " ".join(etykiety(element))
@@ -105,7 +112,7 @@ def sprawdz_eksport_pdf():
                 raise RuntimeError(opis)
             if "Krótka nazwa pliku" in opis:
                 return "nazwa"
-            if element.get("resource-id", "").endswith(":id/action_menu_save"):
+            if czy_przycisk_zapisu(element):
                 return element
         return None
 
@@ -114,8 +121,7 @@ def sprawdz_eksport_pdf():
         kliknij(po_tekscie("Krótka nazwa pliku"))
         adb("shell", "input", "text", "KartaOdbior410")
         kliknij(po_tekscie("Pobierz PDF"))
-        akcja = znajdz(lambda elementy: next((e for e in elementy
-                                             if e.get("resource-id", "").endswith(":id/action_menu_save")), None))
+        akcja = znajdz(lambda elementy: next((e for e in elementy if czy_przycisk_zapisu(e)), None))
     kliknij(akcja)
     po_tekscie("Zapisano PDF w wybranej lokalizacji.")
     nowe = pliki_pdf() - zastane
