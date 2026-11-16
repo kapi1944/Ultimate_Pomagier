@@ -21,7 +21,7 @@ export default function PodgladStrukturalny({ slajd, problemy, czyNakladka = fal
     {slajd.obiekty.map((obiekt) => {
       const id = tozsamoscObiektu(slajd, obiekt)
       const geometria = robocza?.id === id ? robocza.geometria : obiekt.geometria
-      if (!geometria) return null
+      if (!geometria || (czyNakladka && !obiekt.czyProstaGeometria)) return null
       const zaznaczony = Boolean(id && zaznaczenie.includes(id))
       const podswietlony = Boolean(id && podswietlenia.includes(id))
       const edytowalny = Boolean(id && przesun && czyEdytowalny(obiekt))

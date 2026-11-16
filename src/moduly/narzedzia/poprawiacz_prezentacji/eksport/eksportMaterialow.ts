@@ -20,11 +20,14 @@ async function* obrazyStronyDruku(dokument: PDFDocumentProxy, plan: DokumentDruk
 }
 
 export function pobierzPlikMaterialow(plik: Blob, nazwa: string) {
-  const adres = URL.createObjectURL(plik)
-  const odnosnik = document.createElement('a')
-  odnosnik.href = adres; odnosnik.download = nazwa
-  try { document.body.appendChild(odnosnik); odnosnik.click() }
-  finally { odnosnik.remove(); window.setTimeout(() => URL.revokeObjectURL(adres), 1000) }
+  try {
+    const odnosnik = document.createElement('a')
+    const adres = URL.createObjectURL(plik)
+    try {
+      odnosnik.href = adres; odnosnik.download = nazwa
+      document.body.appendChild(odnosnik); odnosnik.click()
+    } finally { odnosnik.remove(); window.setTimeout(() => URL.revokeObjectURL(adres), 1000) }
+  } catch (blad) { throw new Error(`Nie udało się rozpocząć pobierania pliku „${nazwa}”.`, { cause: blad }) }
 }
 
 export async function zlozStroneDruku(dokument: PDFDocumentProxy, plan: DokumentDruku, indeks: number, szerokoscPikseli: number) {
@@ -73,10 +76,12 @@ export async function wygenerujKompletZip(pliki: PlikMaterialow[], instrukcja: s
   return archiwum.generateAsync({ type: 'blob', mimeType: 'application/zip', compression: 'DEFLATE' })
 }
 
-export async function wygenerujPngOkladki(bufor: ArrayBuffer) {
+export async function wygenerujPngOkladki(bufor: ArrayBuffer, szerokosc: number) {
   const dokument = await otworzPdfPrezentacji(bufor)
   try {
-    const plotno = await renderujStronePdf(dokument, 1, 2480)
-    return await new Promise<Blob>((rozwiaz, odrzuc) => plotno.toBlob((plik) => plik ? rozwiaz(plik) : odrzuc(new Error('Nie udało się wygenerować PNG.')), 'image/png'))
+    const plotno = await renderujStronePdf(dokument, 1, szerokosc)
+    try {
+      return await new Promise<Blob>((rozwiaz, odrzuc) => plotno.toBlob((plik) => plik ? rozwiaz(plik) : odrzuc(new Error('Nie udało się wygenerować PNG.')), 'image/png'))
+    } finally { plotno.width = 0; plotno.height = 0 }
   } finally { await dokument.loadingTask.destroy() }
 }

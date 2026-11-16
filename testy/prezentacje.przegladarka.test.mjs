@@ -1,19 +1,25 @@
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import { createRequire } from 'node:module'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import test from 'node:test'
 import { jsPDF } from 'jspdf'
 import JSZip from 'jszip'
+import { PDFDocument } from 'pdf-lib'
 import { utworzFixturePptx } from './fixturePptx.ts'
 
 const wymagaj = createRequire(import.meta.url)
 const { chromium } = wymagaj(process.env.POMAGIER_PLAYWRIGHT || 'playwright')
 const adres = process.env.POMAGIER_ADRES || 'http://127.0.0.1:5180'
 const katalog = fileURLToPath(new URL('../tmp/prezentacje/', import.meta.url))
+const uruchom = promisify(execFile)
 
-function utworzPdf(liczba, orientacja = 'landscape') {
-  const pdf = new jsPDF({ orientation: orientacja, unit: 'mm', format: 'a4' })
+function utworzPdf(liczba, orientacja = 'landscape', format = 'a4') {
+  const pdf = new jsPDF({ orientation: orientacja, unit: 'mm', format })
   for (let numer = 1; numer <= liczba; numer++) {
     if (numer > 1) pdf.addPage()
     pdf.setFontSize(28); pdf.text(`Slajd ${numer}`, 20, 30)
@@ -64,7 +70,7 @@ test('Poprawiacz: niezalezne okladki, import, mapowanie, druk PDF, ZIP i uniewaz
     const zlyPdf = utworzPdf(1)
     await strona.getByLabel('Wczytaj PDF aktualnego PPTX (wszystkie slajdy)').setInputFiles({ name: 'zly.pdf', mimeType: 'application/pdf', buffer: zlyPdf })
     await strona.getByRole('alert').filter({ hasText: /PDF ma 1 stron/ }).waitFor()
-    await strona.getByLabel('Wczytaj PDF aktualnego PPTX (wszystkie slajdy)').setInputFiles({ name: 'zgodny.pdf', mimeType: 'application/pdf', buffer: utworzPdf(3) })
+    await strona.getByLabel('Wczytaj PDF aktualnego PPTX (wszystkie slajdy)').setInputFiles({ name: 'zgodny.pdf', mimeType: 'application/pdf', buffer: utworzPdf(3, 'landscape', [338.667, 205]) })
     await strona.getByRole('heading', { name: 'Podgląd wydruku' }).waitFor()
     await strona.waitForFunction(() => document.querySelector('.poprawiacz-prezentacji__wydruk')?.width === 1100)
     const druk = strona.waitForEvent('download')
@@ -90,6 +96,112 @@ test('Poprawiacz: niezalezne okladki, import, mapowanie, druk PDF, ZIP i uniewaz
     assert.deepEqual(bledy, [])
   } catch (blad) { console.error(blad); throw blad }
   finally { await przegladarka.close() }
+})
+
+test('PowerPoint: automatyczny render po edycji i ponowne otwarcie okładek PPTX oraz eksport PDF i PNG', {
+  timeout: 180000, skip: process.platform !== 'win32' || process.env.POMAGIER_TEST_POWERPOINT !== '1',
+}, async () => {
+  const katalogRoboczy = await mkdtemp(join(tmpdir(), 'pomagier-powerpoint-'))
+  const przegladarka = await chromium.launch({ channel: 'chrome', headless: true })
+  const skrypt = fileURLToPath(new URL('../src-tauri/src/renderuj_prezentacje.ps1', import.meta.url))
+  let numerRenderu = 0
+  async function renderuj(bajty, czyZrzuty = false) {
+    const katalogRenderu = join(katalogRoboczy, String(++numerRenderu))
+    await mkdir(katalogRenderu)
+    await writeFile(join(katalogRenderu, 'zrodlo.pptx'), Buffer.from(bajty))
+    await uruchom('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', skrypt,
+      '-Katalog', katalogRenderu, ...(czyZrzuty ? ['-CzyZrzuty'] : [])], { windowsHide: true })
+    return {
+      pdf: await readFile(join(katalogRenderu, 'wynik.pdf')),
+      png: czyZrzuty ? await readFile(join(katalogRenderu, 'slajd-1.png')) : null,
+    }
+  }
+  try {
+    await mkdir(katalog, { recursive: true })
+    const strona = await przegladarka.newPage({ viewport: { width: 1600, height: 1200 } })
+    await otworzNarzedzie(strona)
+    await strona.getByLabel('Nazwa szkolenia', { exact: true }).fill('Warsztat SEMPER')
+    await strona.getByLabel('Trener', { exact: true }).fill('Anna Kowalska')
+    await strona.getByLabel('E-mail trenera', { exact: true }).fill('anna@example.test')
+    const adresWzorca = '**/szablony/prezentacje/semper-pion.pptx'
+    const pionowa = strona.getByRole('group', { name: 'Okładka pionowa', exact: true })
+    await strona.route(adresWzorca, (trasa) => trasa.fulfill({ status: 404 }))
+    await pionowa.getByRole('button', { name: 'Pobierz edytowalną okładkę PPTX' }).click()
+    await strona.getByRole('alert').filter({ hasText: /semper-pion\.pptx/ }).waitFor()
+    await strona.getByText('Diagnostyka eksportu (1)', { exact: true }).waitFor()
+    await strona.unroute(adresWzorca)
+    async function pobierz(przycisk) {
+      const zdarzenie = strona.waitForEvent('download')
+      await przycisk.click()
+      const plik = await zdarzenie
+      return readFile(await plik.path())
+    }
+    for (const orientacja of ['pionowa', 'pozioma']) {
+      const grupa = strona.getByRole('group', { name: `Okładka ${orientacja}`, exact: true })
+      const pptx = await pobierz(grupa.getByRole('button', { name: 'Pobierz edytowalną okładkę PPTX' }))
+      const wynik = await renderuj(pptx, true)
+      assert.equal((await PDFDocument.load(wynik.pdf)).getPageCount(), 1)
+      await writeFile(join(katalog, `powerpoint-${orientacja}.png`), wynik.png)
+      await grupa.getByLabel('Wczytaj PDF tej okładki po eksporcie z PowerPoint').setInputFiles({ name: 'powerpoint.pdf', mimeType: 'application/pdf', buffer: wynik.pdf })
+      if (orientacja === 'pionowa') {
+        await strona.evaluate(() => {
+          window.przywrocKodowaniePng = HTMLCanvasElement.prototype.toBlob
+          HTMLCanvasElement.prototype.toBlob = (zapisz) => zapisz(null)
+        })
+        await grupa.getByRole('button', { name: /Pobierz PNG/ }).click()
+        await strona.getByRole('alert').filter({ hasText: /Generowanie okładki \(pionowa, PNG\)/ }).waitFor()
+      }
+      const pdf = await pobierz(grupa.getByRole('button', { name: /PDF A4/ }))
+      if (orientacja === 'pionowa') {
+        await strona.evaluate(() => { HTMLCanvasElement.prototype.toBlob = window.przywrocKodowaniePng })
+      }
+      const dokument = await PDFDocument.load(pdf)
+      assert.equal(dokument.getPageCount(), 1)
+      const { width: szerokosc, height: wysokosc } = dokument.getPage(0).getSize()
+      assert.ok(Math.abs(szerokosc * 25.4 / 72 - (orientacja === 'pionowa' ? 210 : 297)) < .1)
+      assert.ok(Math.abs(wysokosc * 25.4 / 72 - (orientacja === 'pionowa' ? 297 : 210)) < .1)
+      const png = await pobierz(grupa.getByRole('button', { name: /Pobierz PNG/ }))
+      assert.equal(png.subarray(1, 4).toString(), 'PNG')
+      assert.equal(png.readUInt32BE(16), orientacja === 'pionowa' ? 2480 : 3508)
+      await writeFile(join(katalog, `eksport-${orientacja}.pdf`), pdf)
+      await writeFile(join(katalog, `eksport-${orientacja}.png`), png)
+    }
+    await strona.exposeFunction('testowyPowerPoint', async (bajty) => {
+      const { pdf } = await renderuj(bajty)
+      const opis = Buffer.from(JSON.stringify({ silnik: 'PowerPoint', uwagi: [] }))
+      const dlugosc = Buffer.alloc(4)
+      dlugosc.writeUInt32LE(opis.length)
+      return [...Buffer.concat([dlugosc, opis, pdf])]
+    })
+    // Przeglądarka zastępuje transport Tauri. Render każdej rewizji wykonuje rzeczywisty PowerPoint.
+    await strona.evaluate(() => {
+      window.isTauri = true
+      window.__TAURI_INTERNALS__ = { invoke: async (polecenie, dane) => {
+        if (polecenie === 'informacje_o_platformie') return { system: 'windows' }
+        if (polecenie !== 'renderuj_prezentacje' || !(dane instanceof ArrayBuffer)) throw new Error('Nieoczekiwane wywołanie Tauri.')
+        return new Uint8Array(await window.testowyPowerPoint([...new Uint8Array(dane)])).buffer
+      } }
+    })
+    await strona.getByLabel('Wybierz plik prezentacji PPTX').setInputFiles(fileURLToPath(new URL('../public/szablony/prezentacje/semper-poziom.pptx', import.meta.url)))
+    await strona.getByRole('button', { name: 'Analizuj prezentację', exact: true }).click()
+    const tryby = strona.getByRole('region', { name: 'Tryby prezentacji' })
+    const plotno = tryby.locator('.prezentacja-podglad canvas:not([hidden])')
+    await plotno.waitFor({ timeout: 45000 })
+    const przed = await plotno.evaluate((element) => element.toDataURL())
+    await tryby.locator('.prezentacja-podglad .prezentacja-obiekt[data-tozsamosc$="#29717"]').press('Enter')
+    await tryby.getByLabel('Fragment tekstu 1', { exact: true }).fill('Zmieniony wieloakapitowy tytuł')
+    await tryby.getByRole('button', { name: 'Zastosuj właściwości', exact: true }).click()
+    await tryby.getByText('Historia zmian (1)', { exact: true }).waitFor()
+    await plotno.waitFor({ timeout: 45000 })
+    assert.notEqual(await plotno.evaluate((element) => element.toDataURL()), przed)
+    assert.equal(numerRenderu, 4)
+    await strona.getByLabel('Źródło okładki').selectOption('pierwszySlajd')
+    assert.equal((await PDFDocument.load(await pobierz(pionowa.getByRole('button', { name: /PDF A4/ })))).getPageCount(), 1)
+    await tryby.screenshot({ path: join(katalog, 'powerpoint-podglad-po-edycji.png') })
+  } finally {
+    await przegladarka.close()
+    await rm(katalogRoboczy, { recursive: true, force: true })
+  }
 })
 
 test('rzeczywiste PDF: 1, 10, 99, 100, 101 i 292 slajdy oraz dokladny podzial stron', { timeout: 900000 }, async () => {
@@ -249,7 +361,7 @@ test('wierne PDF: wspolna metoda renderowania, odswiezanie cache i brak renderow
     await tryby.getByText('Historia zmian (1)', { exact: true }).waitFor()
     await tryby.getByRole('button', { name: 'Porównawczy', exact: true }).click()
     await tryby.getByText('Renderowanie podglądu', { exact: true }).click()
-    const bufor = utworzPdf(3)
+    const bufor = utworzPdf(3, 'landscape', [250, 150])
     await tryby.getByLabel('PDF oryginału', { exact: true }).setInputFiles({ name: 'oryginal.pdf', mimeType: 'application/pdf', buffer: bufor })
     await strona.waitForFunction(() => document.querySelector('.poprawiacz-prezentacji').getAttribute('aria-busy') === 'false')
     await tryby.getByLabel('PDF aktualnej wersji', { exact: true }).setInputFiles({ name: 'aktualny.pdf', mimeType: 'application/pdf', buffer: bufor })
@@ -267,7 +379,10 @@ test('wierne PDF: wspolna metoda renderowania, odswiezanie cache i brak renderow
     console.log('Pamięć po 24 przełączeniach: ' + Math.round((po.usedSize - przed.usedSize) / 1024) + ' KiB')
     await tryby.getByRole('button', { name: 'Porównaj piksele', exact: true }).click()
     await tryby.getByText(/Różnice wizualne: 0.00%/).waitFor()
-    const inny = new jsPDF({ orientation: 'landscape', format: 'a4' })
+    await tryby.getByLabel('PDF aktualnej wersji', { exact: true }).setInputFiles({ name: 'a4.pdf', mimeType: 'application/pdf', buffer: utworzPdf(3) })
+    await tryby.getByRole('alert').filter({ hasText: /ma inne proporcje/ }).waitFor()
+    assert.equal(await tryby.locator('.prezentacja-podglad canvas:not([hidden])').count(), 1)
+    const inny = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [250, 150] })
     for (let numer = 1; numer <= 3; numer++) { if (numer > 1) inny.addPage(); inny.setFillColor('#00ff00'); inny.rect(0, 0, 297, 210, 'F') }
     await tryby.getByLabel('PDF aktualnej wersji', { exact: true }).setInputFiles({ name: 'inny.pdf', mimeType: 'application/pdf', buffer: Buffer.from(inny.output('arraybuffer')) })
     await strona.waitForFunction(() => {
@@ -283,6 +398,15 @@ test('wierne PDF: wspolna metoda renderowania, odswiezanie cache i brak renderow
     await strona.keyboard.press('Escape')
     await tryby.getByRole('button', { name: 'Roboczy', exact: true }).click()
     await tryby.locator('.prezentacja-podglad canvas:not([hidden])').waitFor()
+    for (const powiekszenie of ['100%', '150%', '200%', '400%']) {
+      await tryby.getByRole('button', { name: powiekszenie, exact: true }).click()
+      const scena = tryby.locator('.prezentacja-podglad')
+      const obraz = await scena.locator('canvas').boundingBox()
+      const nakladka = await scena.locator('.prezentacja-struktura').boundingBox()
+      assert.deepEqual(obraz, nakladka, `obraz i obiekty w tym samym miejscu przy ${powiekszenie}`)
+      assert.ok(Math.abs(obraz.width / obraz.height - 5 / 3) < .002)
+    }
+    await tryby.getByRole('button', { name: 'Dopasuj do okna' }).click()
     await tryby.locator('.prezentacja-lista-obiektow').getByRole('button', { name: 'Obiekt 5', exact: true }).click()
     await tryby.getByLabel('Fragment tekstu 1', { exact: true }).fill('Nowa rewizja')
     await tryby.getByRole('button', { name: 'Zastosuj właściwości', exact: true }).click()

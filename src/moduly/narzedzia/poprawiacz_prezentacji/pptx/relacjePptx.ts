@@ -1,4 +1,4 @@
-import { potomkowieXml, przestrzeniePptx } from './xmlPptx'
+import { dzieckoXml, dzieciXml, potomkowieXml, przestrzeniePptx } from './xmlPptx'
 
 export function rozwiazSciezkeCzesci(czesc: string, cel: string): string {
   const segmenty = cel.startsWith('/') ? [] : czesc.split('/').slice(0, -1)
@@ -22,7 +22,8 @@ export function odczytajRelacje(dokument: Document, czesc: string) {
 
 export function ustalKolejnoscSlajdow(prezentacja: Document, relacje: Document): string[] {
   const listaRelacji = odczytajRelacje(relacje, 'ppt/presentation.xml')
-  return potomkowieXml(prezentacja, 'sldId').map((element) => {
+  const listaSlajdow = dzieckoXml(prezentacja.documentElement, 'sldIdLst')
+  return (listaSlajdow ? dzieciXml(listaSlajdow, 'sldId') : []).map((element) => {
     const id = przestrzeniePptx.relacje.map((przestrzen) => element.getAttributeNS(przestrzen, 'id')).find(Boolean)
     const relacja = listaRelacji.find((pozycja) => pozycja.id === id && pozycja.typ.endsWith('/slide'))
     if (!relacja || !relacja.cel.startsWith('ppt/slides/')) throw new Error('Nie można ustalić kolejności slajdów z relacji PPTX.')

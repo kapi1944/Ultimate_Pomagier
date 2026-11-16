@@ -19,13 +19,14 @@ Object.defineProperty(globalThis, 'XMLSerializer', { value: XMLSerializer, confi
 
 async function utworzLiczbeSlajdow(liczba: number) {
   const archiwum = await JSZip.loadAsync(await utworzFixturePptx())
-  archiwum.file('ppt/presentation.xml', `<p:presentation xmlns:p="${przestrzenPrezentacji}" xmlns:r="${przestrzenRelacji}"><p:sldIdLst>${Array.from({ length: liczba }, (_, indeks) => `<p:sldId id="${indeks + 256}" r:id="rId${indeks + 1}"/>`).join('')}</p:sldIdLst><p:sldSz cx="10000000" cy="6000000"/></p:presentation>`)
+  const sekcja = liczba === 196 ? '<p:extLst><p:ext uri="{521415D9-36F7-43E2-AB2F-B90AF26B5E84}"><p14:sectionLst xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main"><p14:section name="Wstęp"><p14:sldIdLst><p14:sldId id="256"/></p14:sldIdLst></p14:section></p14:sectionLst></p:ext></p:extLst>' : ''
+  archiwum.file('ppt/presentation.xml', `<p:presentation xmlns:p="${przestrzenPrezentacji}" xmlns:r="${przestrzenRelacji}"><p:sldIdLst>${Array.from({ length: liczba }, (_, indeks) => `<p:sldId id="${indeks + 256}" r:id="rId${indeks + 1}"/>`).join('')}</p:sldIdLst><p:sldSz cx="10000000" cy="6000000"/>${sekcja}</p:presentation>`)
   archiwum.file('ppt/_rels/presentation.xml.rels', `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${Array.from({ length: liczba }, (_, indeks) => `<Relationship Id="rId${indeks + 1}" Type="${przestrzenRelacji}/slide" Target="slides/slide${indeks + 1}.xml"/>`).join('')}</Relationships>`)
   for (let numer = 1; numer <= liczba; numer++) archiwum.file(`ppt/slides/slide${numer}.xml`, xmlSlajdu(ksztaltTestowy(2, 500000, 800000, 2000000, 400000, `Slajd ${numer}`, 'FFFFFF')))
   return otworzPptx(await archiwum.generateAsync({ type: 'arraybuffer' }))
 }
 
-for (const liczba of [1, 10, 99, 100, 101, 292]) {
+for (const liczba of [1, 10, 99, 100, 101, 196, 292]) {
   test(`prezentacja ${liczba} slajdow: kolejnosc, wymiary, wzorce, edytowalnosc i liczba stron druku`, async () => {
     const model = await utworzLiczbeSlajdow(liczba)
     const oryginal = new Uint8Array(model.buforZrodlowy.slice(0))
@@ -136,6 +137,21 @@ for (const orientacja of ['pionowa', 'pozioma'] as const) {
     assert.equal(potomkowieXml(wynik.czesciXml.get('ppt/presentation.xml')!, 'sldId').length, 1)
   })
 }
+
+test('okladka z brakujaca grafika slajdu lub brakujacym wzorcem wskazuje konkretny plik', async () => {
+  const archiwum = await JSZip.loadAsync(await readFile(new URL('../public/szablony/prezentacje/semper-poziom.pptx', import.meta.url)))
+  const model = await otworzPptx(await archiwum.generateAsync({ type: 'arraybuffer' }))
+  const slajd = model.slajdy[0]
+  assert.ok(slajd.czescWzorca)
+  for (const sciezka of ['ppt/media/image2.png', slajd.czescWzorca]) {
+    const grafika = await archiwum.file(sciezka)!.async('uint8array')
+    archiwum.remove(sciezka)
+    const bufor = await archiwum.generateAsync({ type: 'arraybuffer' })
+    await assert.rejects(() => wypelnijSzablonOkladki(bufor, 'pozioma', { ...pusteDaneOkladki, tytul: 'Szkolenie' }),
+      (blad: Error) => blad.message.includes('Brak oryginalnych zasobów graficznych SEMPER') && blad.message.includes(sciezka))
+    archiwum.file(sciezka, grafika)
+  }
+})
 
 test('komplet ZIP zawiera poprawne pliki, instrukcje druku i odrzuca duplikaty nazw', async () => {
   const pliki = [{ nazwa: 'prezentacja.pptx', plik: new Blob(['PPTX']) }, { nazwa: 'druk.pdf', plik: new Blob(['PDF']) }]

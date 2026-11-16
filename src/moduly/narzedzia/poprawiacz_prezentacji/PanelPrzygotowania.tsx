@@ -22,6 +22,7 @@ export default function PanelPrzygotowania({ model, czyZajety, ustawZajety, zmie
   const [mapowanie, ustawMapowanie] = useState<MapowaniePola[]>([])
   const uwagi = useMemo(() => model?.slajdy.flatMap(analizujUklad) ?? [], [model])
   const zrodlo = szczegoly.find((pozycja) => pozycja.id === szczegolyId)
+  const czyWybranaGrupa = zrodlo?.grupy.some((grupa) => grupa.id === grupaId)
   const pola = model?.slajdy[0].obiekty.filter((obiekt) => obiekt.typ === 'ksztalt' && obiekt.tekst.trim() && obiekt.id) ?? []
   const mapa = pola.map((obiekt) => mapowanie.find((pozycja) => pozycja.idObiektu === obiekt.id) ?? { idObiektu: obiekt.id, pole: zaproponujMapowanie(obiekt) })
   const liczbaWybranych = mapa.filter((pozycja) => pozycja.pole || pozycja.wartoscReczna !== undefined).length
@@ -30,7 +31,11 @@ export default function PanelPrzygotowania({ model, czyZajety, ustawZajety, zmie
     if (czyZajety) return
     ustawZajety(true); ustawBlad(''); ustawKomunikat('')
     try { await operacja() }
-    catch (bladOperacji) { ustawBlad(bladOperacji instanceof Error ? bladOperacji.message : 'Nie udało się przygotować prezentacji.') }
+    catch (bladOperacji) {
+      const opis = bladOperacji instanceof Error ? bladOperacji.message : 'Nie udało się przygotować prezentacji.'
+      console.error('[Poprawiacz prezentacji] Przygotowanie danych', opis)
+      ustawBlad(opis)
+    }
     finally { ustawZajety(false) }
   }
 
@@ -60,7 +65,7 @@ export default function PanelPrzygotowania({ model, czyZajety, ustawZajety, zmie
         <legend>Źródło danych organizacyjnych</legend>
         <label>Szczegóły organizacyjne<select value={szczegolyId} onChange={(zdarzenie) => { ustawSzczegolyId(zdarzenie.target.value); ustawGrupeId('') }}><option value="">Wybierz szkolenie</option>{szczegoly.map((pozycja) => <option key={pozycja.id} value={pozycja.id}>{pozycja.nazwa}{pozycja.czyKopiaRobocza ? ' (kopia robocza)' : ''}</option>)}</select></label>
         <label>Grupa / termin<select value={grupaId} onChange={(zdarzenie) => ustawGrupeId(zdarzenie.target.value)}><option value="">Wybierz grupę</option>{zrodlo?.grupy.map((grupa) => <option key={grupa.id} value={grupa.id}>{grupa.nazwa} — {grupa.dataOd}</option>)}</select></label>
-        <div className="poprawiacz-prezentacji__akcje"><button type="button" onClick={() => ustawSzczegoly(pobierzSzczegolyDoGeneratorow())}>Odśwież źródła</button><button type="button" disabled={!zrodlo || !grupaId} onClick={() => { if (zrodlo) ustawDaneOkladki(daneOkladkiZeSzczegolow(zrodlo, grupaId)) }}>Wczytaj dane wybranej grupy</button></div>
+        <div className="poprawiacz-prezentacji__akcje"><button type="button" onClick={() => void wykonaj(async () => ustawSzczegoly(pobierzSzczegolyDoGeneratorow()))}>Odśwież źródła</button><button type="button" disabled={!czyWybranaGrupa} onClick={() => void wykonaj(async () => { if (zrodlo) ustawDaneOkladki(daneOkladkiZeSzczegolow(zrodlo, grupaId)) })}>Wczytaj dane wybranej grupy</button></div>
         {(Object.keys(daneOkladki) as (keyof DaneOkladki)[]).map((klucz) => <label key={klucz}>{etykietyPol[klucz]}<input type="text" value={daneOkladki[klucz]} onChange={(zdarzenie) => ustawDaneOkladki({ ...daneOkladki, [klucz]: zdarzenie.target.value })} /></label>)}
       </fieldset>
       {model && <details><summary>Zatwierdź mapowanie pól ({liczbaWybranych} wybranych)</summary>
