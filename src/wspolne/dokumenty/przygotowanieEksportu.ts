@@ -1,13 +1,13 @@
-type UstawieniaPrzygotowaniaEksportu = {
+type UstawieniaPrzygotowaniaEksportu<Wynik> = {
   przygotuj?: () => void | Promise<void>
-  wykonaj: () => void | Promise<void>
+  wykonaj: () => Wynik | Promise<Wynik>
   zakoncz?: () => void
 }
 
-export async function wykonajEksportPoPrzygotowaniu({ przygotuj, wykonaj, zakoncz }: UstawieniaPrzygotowaniaEksportu) {
+export async function wykonajEksportPoPrzygotowaniu<Wynik>({ przygotuj, wykonaj, zakoncz }: UstawieniaPrzygotowaniaEksportu<Wynik>) {
   try {
     await przygotuj?.()
-    await wykonaj()
+    return await wykonaj()
   } finally {
     zakoncz?.()
   }

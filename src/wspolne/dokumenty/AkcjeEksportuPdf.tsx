@@ -44,6 +44,7 @@ export default function AkcjeEksportuPdf({ dokumentId, odciskFormularza, silnikP
   }, [przejscie, obszarDokumentu])
   const [czyGenerowanie, ustawCzyGenerowanie] = useState(false)
   const [blad, ustawBlad] = useState<string | null>(null)
+  const [komunikatPobrania, ustawKomunikatPobrania] = useState<string | undefined>()
   const [nazwaUzytkownika, ustawNazweUzytkownika] = useState('')
   const [czyPytacONazwe, ustawCzyPytacONazwe] = useState(false)
   const daneZNazwaUzytkownika = daneNazwyEksportu ? { ...daneNazwyEksportu, nazwaUzytkownika } : undefined
@@ -67,15 +68,17 @@ export default function AkcjeEksportuPdf({ dokumentId, odciskFormularza, silnikP
     }
 
     ustawBlad(null)
+    ustawKomunikatPobrania(undefined)
     ustawCzyGenerowanie(true)
     try {
-      await wykonajEksportPoPrzygotowaniu({
+      const wynik = await wykonajEksportPoPrzygotowaniu({
         przygotuj: przygotujEksport,
         wykonaj: () => pobierzPdfDokumentu({ silnikPdf, obszarDokumentu: obszarDokumentu.current!, nazwaPliku: nazwaDoEksportu, format, orientacja, plynnyUklad, marginesMm: plynnyUklad ? 9 : undefined }, przedPobraniemPdf),
         zakoncz: zakonczEksport,
       })
-    } catch {
-      ustawBlad('Nie udało się utworzyć pliku PDF. Sprawdź obrazy w podglądzie i spróbuj ponownie.')
+      ustawKomunikatPobrania(wynik)
+    } catch (blad) {
+      ustawBlad(blad instanceof Error && blad.cause ? blad.message : 'Nie udało się utworzyć pliku PDF. Sprawdź obrazy w podglądzie i spróbuj ponownie.')
     } finally {
       ustawCzyGenerowanie(false)
     }
@@ -117,5 +120,6 @@ export default function AkcjeEksportuPdf({ dokumentId, odciskFormularza, silnikP
       <div><button className={classNamePrzycisku} onClick={() => { ustawCzyPytacONazwe(false); void pobierzPdf() }} type="button">Pobierz PDF</button><button className={classNamePrzycisku} onClick={() => ustawCzyPytacONazwe(false)} type="button">Anuluj</button></div>
     </div>}
     {blad && <p className="akcje-eksportu-pdf__blad" role="alert">{blad}</p>}
+    {komunikatPobrania && <p role="status">{komunikatPobrania}</p>}
   </div>
 }

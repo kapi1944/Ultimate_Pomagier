@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { utworzNazwePlikuPdf } from '../../../../wspolne/dokumenty/eksportPdf'
+import { utworzNazwePlikuPdf, zapiszWyrenderowanyPdf } from '../../../../wspolne/dokumenty/eksportPdf'
 import { oznaczSemantykePdf, zmierzScenePdf } from '../../../../wspolne/dokumenty/semantykaPdf'
 import { zakodujAdresEtykiety } from './kodQrEtykiety'
 import { celeEtykiety, czyWymiaryEtykietyPoprawne, domyslneWymiaryEtykiety, pobierzEtykietyPaczek, type CelEtykiety, type EtykietaPaczki, type TrybEtykiety, type WymiaryEtykiety } from './modelEtykietyPaczki'
@@ -160,7 +160,7 @@ export default function PanelEtykietPaczek({ dokument, moznaZapisywac, zapisz, o
       if (!zarejestrujEksportEtykiet(dokument.id, wybrane, `${wymiary.szerokosc} × ${wymiary.wysokosc} mm`, tryb, czyWydrukQr)) {
         throw new Error('Dane etykiety zmieniły się lub zapis jest niedostępny. Odśwież podgląd.')
       }
-      pdf.save(nazwa)
+      await zapiszWyrenderowanyPdf(pdf, nazwa)
       odswiez()
     } catch (blad) { ustawBlad(blad instanceof Error ? blad.message : 'Nie udało się przygotować PDF etykiety.') }
     finally { blokada.current = false; ustawEksport(false) }
