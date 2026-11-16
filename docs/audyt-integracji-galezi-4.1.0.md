@@ -1,5 +1,16 @@
 # Audyt gałęzi Ultimate Pomagier 4.1.0
 
+## Wynik integracji
+
+- Commit `eb37aaaea0153eed979fb07e06fa6479cc28dab3` zawiera zmiany aplikacji. Przed scaleniem gałąź robocza była czysta. Zdalny `main` po scaleniu wskazywał `0da854373df8ffbfa6e660e5441713289d20280d`. [PR #6](https://github.com/kapi1944/Ultimate_Pomagier/pull/6)
+- Kontrole PR zakończyły się sukcesem. Build Windows utworzył instalator testowy, a build Android utworzył APK debug. Po scaleniu przeszły CI i budowanie instalatora Windows na `main`. [CI PR](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43843918462) · [Windows PR](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43843918485) · [Android PR](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43843918578) · [CI main](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43846009423) · [Windows main](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43846009243)
+- Lokalna macierz Playwright przeszła 54 z 55 przypadków w pierwszym przebiegu poza sandboxem. Test produkcyjnego logowania uruchomiony na zastępczym porcie zakończył się timeoutem. Jego powtórka na oczekiwanym porcie 47831 oraz dodatkowy test preferencji i PDF Programów przeszły. Dodatkowe 13 testów magazynu, monitora i prezentacji oraz test centrum wersji przeszły.
+- Wszystkie 10 pobranych plików ze szkicu 4.1.0 ma rozmiary i sumy SHA-256 zgodne z metadanymi GitHub. Sumy instalatora, APK i WEB są zgodne z manifestem oraz plikami kontrolnymi. Publiczny klucz aktualizatora zweryfikował podpis Ed25519 instalatora oraz podpis metadanych Minisign. [Szkic 4.1.0](https://github.com/kapi1944/Ultimate_Pomagier/releases/tag/untagged-7d6b9eae10d4320c70e0)
+- Nowy tag `v4.1.1` wskazuje SHA `0da854373df8ffbfa6e660e5441713289d20280d`. Podpisane buildy Windows i Android, paczka WEB oraz tworzenie szkicu zakończyły się sukcesem. W szkicu jest 10 plików, w tym instalator EXE, APK arm64, ZIP WEB, trzy sumy kontrolne, podpis Tauri i trzy manifesty. Weryfikacja pobranych plików potwierdziła SHA-256, podpis Ed25519 i komentarz Minisign, zgodność `latest.json`, wersji i SHA źródeł. Pipeline zweryfikował certyfikat APK, a kontrola pakietu potwierdziła `versionCode=4001001` i obecność natywnej klasy zapisu PDF. [Build 4.1.1](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43846095477) · [Szkic 4.1.1](https://github.com/kapi1944/Ultimate_Pomagier/releases/tag/untagged-1c6a06b7203ba1012029)
+- Odbiory na podpisanych artefaktach przeszły dla przejść 4.0.0 → 4.1.1 i 4.1.0 → 4.1.1. Na izolowanym Windows sprawdzono konto, zadanie, kopię roboczą, zachowanie edycji po anulowaniu zamknięcia, zapis przy zamknięciu i ponowny start. Na emulatorze Android sprawdzono instalację APK na istniejącym pakiecie, konto po dwóch startach oraz utworzenie nowego pliku Karty na drzwi z nagłówkiem `%PDF-` i zakończeniem `%%EOF`. [Odbiór z 4.0.0](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43851953970) · [Odbiór z 4.1.0](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43851048127)
+- Końcowy `origin/main` to `7c8165344b8187bf456634f6c56274a2236550c0`. Po podpisanym wydaniu wprowadzono na `main` wyłącznie poprawkę selektora w `testy/aktualizacjaAndroid.natywna.py`. CI i build Windows dla tej poprawki przeszły w PR. [PR #7](https://github.com/kapi1944/Ultimate_Pomagier/pull/7) · [CI](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43851052911) · [Windows](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43851052926)
+- Środowisko publikacji `wydania-produkcyjne` dopuszcza tagi `v4.0.0` i `v4.1.0` oraz wymaga zatwierdzenia recenzenta. Publikacja 4.1.1 wymaga objęcia `v4.1.1` regułą tego środowiska i ukończenia odbioru.
+
 ## Zapis PDF i odzyskane zmiany
 
 | Źródło | Zmiana | Integracja | Kontrola |
@@ -19,6 +30,7 @@ W stashach sprawdzono także dodatkowe drzewa plików nieśledzonych. Test zapis
 - `43713741684` na tym samym SHA: podpisane buildy Windows i Android, WEB oraz przygotowanie szkicu zakończone sukcesem. [Przygotowanie 4.1.0](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43713741684)
 - `43717235450`, próba 1, SHA `61062cc2ab5f90b9f56e9c15c7d15bfd79f0e232`, workflow „Instalator Windows”, wynik `failure`. Zadanie `odbior-android` nie przeszło kroku `Run python testy/aktualizacjaAndroid.natywna.py`. `instalator` i `odbior-migracji` zostały pominięte przez warunki gałęzi odbiorowej. Test zachował konto po instalacji APK i dwóch startach, zapisał kartę, a następnie zgłosił `RuntimeError: Brak wyeksportowanego PDF w katalogu Download`. W tym wydaniu pojedynczy eksport opierał się na `jsPDF.save()` w Android WebView, a natywne polecenie pakietu jawnie odrzucało Androida. [Log zadania](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43717235450/job/132821291819)
 - `43715684738`: natywna aktualizacja Windows 4.0.0 → 4.1.0 potwierdziła konto, zadanie, szkic, anulowanie zamknięcia z edycją i drugi start. `43716173072`: Android potwierdził aktualizację konta i zapamiętanego loginu, przed dodaniem asercji PDF. [Windows](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43715684738) · [Android](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43716173072)
+- Pierwsze odbiory 4.1.1 przeszły na Windows z obu wersji bazowych. Na Androidzie aktualizacja zachowała konto i zapamiętany login, a eksport otworzył systemowy selektor z nazwą `TestowaKartaOdbior410_Karta_na_drzwi.pdf` w katalogu Download. Skrypt szukał identyfikatora `action_menu_save`, podczas gdy emulator zwrócił aktywny przycisk `android:id/button1` w pakiecie DocumentsUI. Poprawiono selektor testowy i powtórzono odbiór na podpisanych artefaktach z tego samego przebiegu. [Pierwszy odbiór z 4.0.0](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43849431646) · [Pierwszy odbiór z 4.1.0](https://github.com/kapi1944/Ultimate_Pomagier/actions/runs/43849437006) · [PR testowy #7](https://github.com/kapi1944/Ultimate_Pomagier/pull/7)
 
 Na gałęzi odbiorowej nie było PR. Warunki jobów celowo rozdzielały build instalatora i odbiór istniejących artefaktów. Historia nie zawiera decyzji o odrzuceniu tych zmian do `main`.
 
@@ -41,7 +53,7 @@ Na gałęzi odbiorowej nie było PR. Warunki jobów celowo rozdzielały build in
 - Poprawka ma numer 4.1.1, ponieważ szkic 4.1.0 ma już gotowe artefakty i własny tag. Wydanie 4.1.1 wymaga oddzielnych podpisanych artefaktów, odbioru oraz zatwierdzenia w środowisku GitHub `wydania-produkcyjne`.
 - Lokalnie przeszły `npm test`, `npm run lint`, `npm run build`, testy konfiguracji desktopowej, dystrybucji i Launchera, `cargo fmt --check` oraz `git diff --check`. Vite zgłosił ostrzeżenie o rozmiarze części chunków.
 - Lokalna kontrola systemowa Windows blokowała uruchomienie skryptów kompilacji Cargo aplikacji i usługi kont, kod 4551. Potwierdzenie kompilacji natywnej wymaga runnera Windows. Lokalnie brak SDK i NDK Androida.
-- Dotychczasowy natywny odbiór obejmuje konto, zadanie, szkic i strażnika na Windows oraz konto i zapamiętany login na Androidzie. Pozostałe kategorie profilu mają testy modelu, kopii i migracji. Pełny odbiór biblioteki danych i natywnego zapisu pakietów wymaga dodatkowego sprawdzenia na instalacjach.
+- Pozostałe kontrole wydania obejmują pełny profil z zapisanymi szkoleniami, dokumentami, preferencjami i historią po natywnej migracji, wybór folderu i kolizję nazw w systemowym oknie Windows oraz zapis zbiorczego pakietu w natywnym Androidzie. Regresje modelu, kopii E4 i pobierania pakietów w przeglądarce przeszły. Aktualizator Windows sprawdzono w testach konfiguracji i przeglądarki oraz przez niezależną weryfikację podpisu rzeczywistego instalatora. Odbiór natywny uruchamiał podpisany instalator, a test pobrania z publicznego kanału stabilnego wymaga aktywnego wydania.
 
 ## Utrzymywanie gałęzi
 
@@ -59,6 +71,8 @@ Na gałęzi odbiorowej nie było PR. Warunki jobów celowo rozdzielały build in
 ## Gałęzie
 
 Relacja w kolumnie „tylko main / tylko gałąź” dotyczy bazy audytu. Zero po stronie gałęzi oznacza, że jej HEAD znajduje się w historii bazy, więc zestaw plików względem wspólnego przodka jest pusty. Dla gałęzi rozbieżnych wykaz plików znajduje się poniżej tabeli.
+
+Klasy użyte w tabeli to A (zintegrowana), C (zawierała niezintegrowaną funkcjonalność w chwili audytu) i F (archiwum). Historyczne kontrole CI i Windows przeszły dla PR #2–#5. GitHub nie zwrócił kontroli dla PR #1.
 
 | Gałąź | HEAD | Data autora · autor | Tylko main / tylko gałąź | Klasa | PR | Zakres i rozstrzygnięcie |
 | --- | --- | --- | --- | --- | --- | --- |
