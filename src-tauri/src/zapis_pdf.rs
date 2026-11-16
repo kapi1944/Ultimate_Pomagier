@@ -1,10 +1,51 @@
 use std::{fs::OpenOptions, io::Write, path::Path};
 
-pub(crate) fn zapisz_w_katalogu(
-    katalog: &Path,
+#[cfg(windows)]
+pub(crate) fn wybierz_sciezke(
     nazwa: &str,
-    bajty: &[u8],
-) -> Result<String, String> {
+    wlasciciel: usize,
+) -> Result<Option<std::path::PathBuf>, String> {
+    use std::{ffi::OsString, os::windows::ffi::OsStringExt};
+    use windows_sys::Win32::UI::Controls::Dialogs::{
+        CommDlgExtendedError, GetSaveFileNameW, OFN_EXPLORER, OFN_NOCHANGEDIR, OFN_PATHMUSTEXIST,
+        OPENFILENAMEW,
+    };
+
+    let mut bufor = vec![0u16; 32768];
+    for (miejsce, znak) in bufor.iter_mut().zip(nazwa.encode_utf16()) {
+        *miejsce = znak;
+    }
+    let filtr: Vec<u16> = "Dokument PDF\0*.pdf\0\0".encode_utf16().collect();
+    let rozszerzenie: Vec<u16> = "pdf\0".encode_utf16().collect();
+    let tytul: Vec<u16> = "Zapisz pakiet PDF\0".encode_utf16().collect();
+    let mut ustawienia = OPENFILENAMEW {
+        lStructSize: std::mem::size_of::<OPENFILENAMEW>() as u32,
+        hwndOwner: wlasciciel as *mut std::ffi::c_void,
+        lpstrFile: bufor.as_mut_ptr(),
+        nMaxFile: bufor.len() as u32,
+        lpstrFilter: filtr.as_ptr(),
+        lpstrDefExt: rozszerzenie.as_ptr(),
+        lpstrTitle: tytul.as_ptr(),
+        Flags: OFN_EXPLORER | OFN_NOCHANGEDIR | OFN_PATHMUSTEXIST,
+        ..Default::default()
+    };
+    // Bufory UTF-16 pozostają ważne podczas wywołania systemowego.
+    if unsafe { GetSaveFileNameW(&mut ustawienia) } == 0 {
+        let kod = unsafe { CommDlgExtendedError() };
+        return if kod == 0 {
+            Ok(None)
+        } else {
+            Err(format!("Nie udało się wybrać pliku PDF (błąd {kod})."))
+        };
+    }
+    let koniec = bufor
+        .iter()
+        .position(|znak| *znak == 0)
+        .ok_or("Nieprawidłowa ścieżka zapisu PDF.")?;
+    Ok(Some(OsString::from_wide(&bufor[..koniec]).into()))
+}
+
+pub(crate) fn sprawdz_pdf(nazwa: &str, bajty: &[u8]) -> Result<(), String> {
     if nazwa.is_empty()
         || nazwa.len() > 220
         || !nazwa.ends_with(".pdf")
@@ -19,6 +60,15 @@ pub(crate) fn zapisz_w_katalogu(
     if bajty.len() > 100 * 1024 * 1024 || !bajty.starts_with(b"%PDF-") {
         return Err("Nieprawidłowy PDF lub pakiet większy niż 100 MB.".into());
     }
+    Ok(())
+}
+
+pub(crate) fn zapisz_w_katalogu(
+    katalog: &Path,
+    nazwa: &str,
+    bajty: &[u8],
+) -> Result<String, String> {
+    sprawdz_pdf(nazwa, bajty)?;
     let rdzen = nazwa.strip_suffix(".pdf").ok_or("Brak rozszerzenia PDF.")?;
     for numer in 0..1000 {
         let nazwa_docelowa = if numer == 0 {

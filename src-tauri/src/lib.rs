@@ -8,8 +8,10 @@ mod ochrona_lokalna;
 mod pakiety_pdf;
 #[cfg(desktop)]
 mod prezentacje;
-#[cfg(desktop)]
+#[cfg(any(desktop, target_os = "android"))]
 mod zapis_pdf;
+#[cfg(target_os = "android")]
+mod zapis_pdf_android;
 
 #[cfg(mobile)]
 struct StanKont {
@@ -86,6 +88,8 @@ pub fn uruchom() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init());
+    #[cfg(target_os = "android")]
+    let konstruktor = konstruktor.plugin(zapis_pdf_android::wtyczka());
     #[cfg(desktop)]
     let konstruktor = konstruktor
         .plugin(tauri_plugin_single_instance::init(|aplikacja, _, _| {

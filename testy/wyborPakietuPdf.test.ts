@@ -80,3 +80,20 @@ test('nazwa pliku usuwa niedozwolone znaki Windows i zawiera organizatora, tytu�
   assert.match(nazwa, /_DO_ZATWIERDZENIA.pdf$/)
   assert.ok(!/[<>:"/\\|?*]/.test(nazwa))
 })
+
+test('usunięta wybrana grupa blokuje także pakiet z dokumentami wspólnymi', () => {
+  const { wersja, konfiguracja, dokumenty } = przygotuj()
+  const program = dokumenty.find((dokument) => dokument.typ === 'PROGRAM_SZKOLENIA')!
+  assert.throws(() => przygotujPlanPakietu(wersja, { ...konfiguracja, grupyId: ['usunieta'], wybraneId: [program.id] }), /grupa nie istnieje/)
+  assert.equal(przygotujPlanPakietu(wersja, { ...konfiguracja, grupyId: [], wybraneId: [program.id] }).length, 1)
+})
+
+test('uszkodzona konfiguracja i nieobsługiwany schemat zachowują zapis pakietu', () => {
+  const { wersja, dokumenty, konfiguracja } = przygotuj()
+  for (const dane of [{ ...konfiguracja, wersjaSchematu: 2 }, { ...konfiguracja, wybraneId: [123] }]) {
+    repozytoriumWspolnychDokumentow.zapiszAutosave({ id: 'pakiet-do-zatwierdzenia:' + wersja.id, dokumentId: null, generatorId: 'pakiety_do_zatwierdzenia', dane })
+    const przed = [...magazyn.entries()]
+    assert.throws(() => odczytajKonfiguracjePakietu(wersja.id, dokumenty), /wersja|uszkodzona/)
+    assert.deepEqual([...magazyn.entries()], przed)
+  }
+})

@@ -1,5 +1,8 @@
 import { oczyscNazwePliku } from './nazwyDokumentow'
 import { zmierzScenePdf } from './semantykaPdf'
+import { rozpoznajPlatforme } from '../../aplikacja/desktop/rejestrWydan'
+import { invoke, isTauri } from '@tauri-apps/api/core'
+import type { jsPDF as DokumentPdf } from 'jspdf'
 
 export type UstawieniaEksportuPdf = {
   silnikPdf?: 'semantyczny' | 'raster_legacy'
@@ -62,7 +65,18 @@ export async function renderujPdfDokumentu(ustawienia: UstawieniaEksportuPdf) {
 export async function pobierzPdfDokumentu(ustawienia: UstawieniaEksportuPdf, przedPobraniem?: () => void) {
   const pdf = await renderujPdfDokumentu(ustawienia)
   przedPobraniem?.()
-  pdf.save(utworzNazwePlikuPdf(ustawienia.nazwaPliku))
+  return zapiszWyrenderowanyPdf(pdf, utworzNazwePlikuPdf(ustawienia.nazwaPliku))
+}
+
+export async function zapiszWyrenderowanyPdf(pdf: DokumentPdf, nazwa: string) {
+  if (isTauri() && rozpoznajPlatforme(navigator.userAgent) === 'android') {
+    try {
+      return await invoke<string>('zapisz_pakiet_pdf', { nazwa, bajty: Array.from(new Uint8Array(pdf.output('arraybuffer'))) })
+    } catch (blad) {
+      throw new Error('Nie udało się zapisać PDF na Androidzie. ' + String(blad), { cause: blad })
+    }
+  }
+  pdf.save(nazwa)
 }
 
 export async function drukujDokument(obszar?: HTMLElement, orientacja: 'pionowa' | 'pozioma' = 'pionowa', format: 'a4' | 'a5' | 'a6' = 'a4', plynnyUklad = false) {

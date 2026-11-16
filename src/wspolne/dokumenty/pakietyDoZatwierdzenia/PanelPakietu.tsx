@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { isTauri } from '@tauri-apps/api/core'
+import { rozpoznajPlatforme } from '../../../aplikacja/desktop/rejestrWydan'
 import type { Dokument } from '../modelDokumentu'
 import type { WersjaRoboczaGeneratora } from '../../../moduly/zamkniete/szczegoly_organizacyjne/typy'
 import { czyDokumentJestGrupowy, etykietyDokumentowZeSzczegolow, pobierzStanDokumentuZeSzczegolow, rodzajeWszystkichDokumentow, utworzDokumentZeSzczegolow, type RodzajDokumentuZeSzczegolow } from '../../integracje/szczegolyDoDokumentow'
@@ -76,10 +78,10 @@ export default function PanelPakietu({ wersja, otworzDokument, zamknij, poUtworz
     } catch (blad) { ustawBlad(kontroler.current.signal.aborted ? 'Anulowano przygotowywanie pakietu. Nie zapisano częściowego pliku.' : String(blad instanceof Error ? blad.message : blad)) }
     finally { blokada.current = false; ustawCzyPracuje(false); ustawPostep(null) }
   }
-  async function pobierz() {
+  async function pobierz(wybierzMiejsce = false) {
     if (blokada.current || !pakiet) return
-    blokada.current = true; ustawCzyPracuje(true); ustawBlad('')
-    try { ustawKomunikat(await pobierzGotowyPakiet(pakiet, wersja, konfiguracja)) }
+    blokada.current = true; ustawCzyPracuje(true); ustawBlad(''); ustawKomunikat('')
+    try { ustawKomunikat(await pobierzGotowyPakiet(pakiet, wersja, konfiguracja, wybierzMiejsce)) }
     catch (blad) { ustawBlad(String(blad instanceof Error ? blad.message : blad)) }
     finally { blokada.current = false; ustawCzyPracuje(false) }
   }
@@ -128,6 +130,9 @@ export default function PanelPakietu({ wersja, otworzDokument, zamknij, poUtworz
       <button type="button" onClick={() => { if (czyPracuje) kontroler.current?.abort(); else zamknij() }}>Anuluj</button>
       <button type="button" disabled={czyPracuje || !konfiguracja.wybraneId.length} onClick={() => void generuj()}>👁 Podgląd pakietu PDF</button>
       <button type="button" disabled={czyPracuje || !aktualnyPodglad} onClick={() => void pobierz()}>⬇ Pobierz zbiorczy PDF</button>
+      {isTauri() && rozpoznajPlatforme(navigator.userAgent) === 'windows' && (
+        <button type="button" disabled={czyPracuje || !aktualnyPodglad} onClick={() => void pobierz(true)}>Zapisz zbiorczy PDF jako…</button>
+      )}
     </div></footer>
     {pakiet && <PodgladPakietu pakiet={pakiet} />}
   </section>

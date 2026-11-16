@@ -1,0 +1,152 @@
+name: Odbiór natywny Windows i Android
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src-tauri/**'
+      - 'skrypty/budujAndroid.mjs'
+      - '.github/workflows/odbior-natywny.yml'
+  workflow_dispatch:
+    inputs:
+      poprzedni_przebieg:
+        description: Identyfikator przebiegu budowania poprzedniego wydania
+        required: true
+        type: number
+      przebieg_wydania:
+        description: Identyfikator przebiegu budowania odbieranego wydania
+        required: true
+        type: number
+      poprzednia_wersja:
+        description: Wersja instalacji bazowej
+        required: true
+        type: string
+      wersja:
+        description: Wersja odbierana
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  POMAGIER_WERSJA_BAZOWA: ${{ inputs.poprzednia_wersja }}
+  POMAGIER_WERSJA_ODBIERANA: ${{ inputs.wersja }}
+
+jobs:
+  kompilacja-android:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '12266719'
+          packages: 'platform-tools'
+      - run: sdkmanager 'ndk;27.2.12479018' 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - run: npm ci
+      - run: npm run android:build:test
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+
+  odbior-migracji:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-2022
+    timeout-minutes: 18
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.poprzedni_przebieg }}
+          pattern: Ultimate-Pomagier-Windows-*
+          path: tmp/odbior-windows/bazowa
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.przebieg_wydania }}
+          pattern: Ultimate-Pomagier-Windows-*
+          path: tmp/odbior-windows/odbierana
+          merge-multiple: true
+      - run: node --test testy/aktualizacjaWindows.natywna.test.mjs
+
+  odbior-android:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: android-actions/setup-android@v3
+        with:
+          cmdline-tools-version: '12266719'
+          packages: 'platform-tools emulator'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.poprzedni_przebieg }}
+          name: Ultimate-Pomagier-Android
+          path: tmp/odbior-android/bazowa
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.przebieg_wydania }}
+          name: Ultimate-Pomagier-Android
+          path: tmp/odbior-android/odbierana
+      - name: Uruchom odizolowany emulator
+        run: |
+          sudo chown "$(id -u)" /dev/kvm
+          sdkmanager 'system-images;android-34;google_apis;x86_64'
+          export ANDROID_AVD_HOME="$RUNNER_TEMP/avd-odbior"
+          mkdir -p "$ANDROID_AVD_HOME"
+          avdmanager -v create avd --force --name odbior --package 'system-images;android-34;google_apis;x86_64' --path "$ANDROID_AVD_HOME/odbior.avd" <<< no
+          if [[ ! -f "$ANDROID_AVD_HOME/odbior.ini" && -f "$ANDROID_AVD_HOME/odbior.avd/config.ini" ]]; then
+            printf 'avd.ini.encoding=UTF-8\npath=%s/odbior.avd\ntarget=android-34\n' "$ANDROID_AVD_HOME" > "$ANDROID_AVD_HOME/odbior.ini"
+          fi
+          sed -i '/^hw.keyboard[[:space:]]*=/d' "$ANDROID_AVD_HOME/odbior.avd/config.ini"
+          printf '\nhw.keyboard=yes\n' >> "$ANDROID_AVD_HOME/odbior.avd/config.ini"
+          "$ANDROID_HOME/emulator/emulator" -list-avds | grep -x odbior
+          nohup "$ANDROID_HOME/emulator/emulator" -avd odbior -no-window -no-audio -no-snapshot -no-boot-anim -gpu swiftshader_indirect > "$RUNNER_TEMP/emulator-odbior.log" 2>&1 &
+          emulator_pid=$!
+          for proba in {1..100}; do
+            kill -0 "$emulator_pid"
+            if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d "\r")" == 1 ]]; then break; fi
+            sleep 3
+          done
+          test "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1
+          adb shell input keyevent KEYCODE_WAKEUP
+          adb shell wm dismiss-keyguard
+          adb shell wm size 1080x2400
+          adb shell wm density 240
+          adb shell settings put secure show_ime_with_hard_keyboard 0
+      - run: python testy/aktualizacjaAndroid.natywna.py
+      - name: Diagnostyka emulatora
+        if: failure()
+        run: |
+          if [[ -f "$RUNNER_TEMP/emulator-odbior.log" ]]; then tail -60 "$RUNNER_TEMP/emulator-odbior.log"; fi
+          adb shell getprop ro.product.cpu.abilist || true
+          adb shell uiautomator dump /sdcard/odbior-pomagiera.xml && adb shell cat /sdcard/odbior-pomagiera.xml || true

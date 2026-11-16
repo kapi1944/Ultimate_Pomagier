@@ -28,10 +28,10 @@ export async function przygotujPakiet(wersja: WersjaRoboczaGeneratora, konfigura
   return { ...wynik, sygnatura, nazwaPliku: nazwaPlikuPakietu(metadane), blob: new Blob([new Uint8Array(wynik.pdfBytes)], { type: 'application/pdf' }) }
 }
 
-export async function pobierzGotowyPakiet(pakiet: GotowyPakiet, wersja: WersjaRoboczaGeneratora, konfiguracja: KonfiguracjaPakietu): Promise<string> {
+export async function pobierzGotowyPakiet(pakiet: GotowyPakiet, wersja: WersjaRoboczaGeneratora, konfiguracja: KonfiguracjaPakietu, wybierzMiejsce = false): Promise<string> {
   if (pakiet.sygnatura !== sygnaturaZrodel(wersja, konfiguracja)) throw new Error('Źródła lub ustawienia zmieniły się. Wygeneruj podgląd ponownie przed pobraniem.')
   const { isTauri, invoke } = await import('@tauri-apps/api/core')
-  if (isTauri()) return invoke<string>('zapisz_pakiet_pdf', { nazwa: pakiet.nazwaPliku, bajty: Array.from(pakiet.pdfBytes) })
+  if (isTauri()) return invoke<string>('zapisz_pakiet_pdf', { nazwa: pakiet.nazwaPliku, bajty: Array.from(pakiet.pdfBytes), wybierzMiejsce })
   const adres = URL.createObjectURL(pakiet.blob)
   const odnosnik = document.createElement('a')
   try {
