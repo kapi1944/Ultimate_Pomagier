@@ -23,18 +23,18 @@ jobs:
   android:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
-          cache: npm
-      - uses: actions/setup-java@v4
+          node-version: '24'
+          cache: 'npm'
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           cmdline-tools-version: '12266719'
           packages: 'platform-tools'
@@ -63,7 +63,7 @@ jobs:
         if: always()
         run: |
           node --input-type=module -e 'import { rmSync } from "node:fs"; import { join } from "node:path"; rmSync(join(process.env.RUNNER_TEMP, "pomagier.jks"), { force: true });'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Ultimate-Pomagier-Android
           path: |
@@ -75,18 +75,18 @@ jobs:
   web:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
-          cache: npm
+          node-version: '24'
+          cache: 'npm'
       - run: npm ci
       - run: npm test
       - run: npm run lint
       - run: npm run web:release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Ultimate-Pomagier-WEB
           path: wydanie-web/
@@ -99,15 +99,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
-          cache: npm
+          node-version: '24'
+          cache: 'npm'
       - run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: Ultimate-Pomagier-*
           path: wydanie-publikacja/pobrane

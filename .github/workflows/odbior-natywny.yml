@@ -40,16 +40,16 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
-          cache: npm
-      - uses: actions/setup-java@v4
+          node-version: '24'
+          cache: 'npm'
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           cmdline-tools-version: '12266719'
           packages: 'platform-tools'
@@ -70,20 +70,20 @@ jobs:
       contents: read
       actions: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
-          cache: npm
+          node-version: '24'
+          cache: 'npm'
       - run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.poprzedni_przebieg }}
           pattern: Ultimate-Pomagier-Windows-*
           path: tmp/odbior-windows/bazowa
           merge-multiple: true
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.przebieg_wydania }}
@@ -100,18 +100,18 @@ jobs:
       contents: read
       actions: read
     steps:
-      - uses: actions/checkout@v4
-      - uses: android-actions/setup-android@v3
+      - uses: actions/checkout@v7
+      - uses: android-actions/setup-android@v4
         with:
           cmdline-tools-version: '12266719'
           packages: 'platform-tools emulator'
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.poprzedni_przebieg }}
           name: Ultimate-Pomagier-Android
           path: tmp/odbior-android/bazowa
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           github-token: ${{ github.token }}
           run-id: ${{ inputs.przebieg_wydania }}
