@@ -4,6 +4,8 @@
 
 Gałąź `audit/integracja-galezi-release-4.1.0`, HEAD `7f2bfe5855e304fb0ac1c6be2ee5347bed10dcbd`. Na wejściu 17 śledzonych plików miało zmiany robocze, a raport poprzedniego etapu był nowym plikiem. Indeks był pusty. Pełny wykaz zastanych zmian zawiera [raport poprzedniego etapu](poprawiacz-prezentacji-render-i-okladki.md). W tej sesji jedynym dodanym plikiem źródłowym jest niniejszy raport.
 
+Podczas testów HEAD przesunął się na `01348481e3079936ce94b13f43575afb036d82f1` (`poprawiacz-prezentacji`). Commit obejmuje 17 plików zastanych zmian i oba raporty. Źródła zmiany HEAD nie ustalono. Po zmianie HEAD końcowe uzupełnienia niniejszego raportu są jedyną różnicą w working tree, a indeks jest pusty.
+
 ## Diagnoza Cargo
 
 Windows Code Integrity zablokował załadowanie bibliotek makr proceduralnych przez `rustc.exe`. Dziennik wskazuje między innymi `phf_macros-5aef6b43130e11f8.dll`, `windows_implement`, `zerofrom_derive` i `time_macros`. Komunikat mówi o niespełnieniu wymaganego poziomu podpisu lub naruszeniu zasad Code Integrity i wskazuje politykę `{0283ac0f-fff1-49ae-ada1-8a933130cad6}`. Rejestr systemu zwrócił `VerifiedAndReputablePolicyState = 1`. DLL `phf_macros` ma status `NotSigned`, a próbny wyłączny odczyt pliku się powiódł.
@@ -22,7 +24,7 @@ Caused by:
 
 W logu Cargo występują również `E0463` dla `tauri_utils` i `cookie` podczas sprawdzania `tauri-runtime`. Rozstrzygnięcie tych błędów wymaga ponownego pełnego przebiegu po przywróceniu możliwości budowania. Potwierdzona blokada 4551 dotyczy wykonania artefaktów przez Windows.
 
-Sprawdzone środowisko to Rust i Cargo 1.99.1, host i toolchain `x86_64-pc-windows-msvc`, Visual Studio Build Tools z linkerem MSVC 14.44.35207, Windows SDK 10.0.26100.0 i WebView2 157.0.4341.60. `Cargo.lock` wskazuje Tauri 2.12.5, Wry 0.57.0 i `webview2-com` 0.39.1. Standardowa konfiguracja Tauri stosuje WebView2 z lokalnym frontendem. Profil demo uruchamia lokalny frontend na porcie 1421 i używa osobnego identyfikatora aplikacji. Zasady Windows pozostały bez zmian.
+Sprawdzone środowisko to Rust i Cargo 1.99.1, host i toolchain `x86_64-pc-windows-msvc`, Visual Studio Build Tools z linkerem MSVC 14.44.35207, Windows SDK 10.0.26100.0 i WebView2 157.0.4341.60. `Cargo.lock` wskazuje Tauri 2.12.5, Wry 0.57.0 i `webview2-com` 0.39.1. Npm ma Tauri API i CLI 2.12.4. `cargo tree --offline --locked -i phf_macros` potwierdza, że `phf_macros` 0.13.1 jest zależnością pośrednią Tauri przez `phf` i `tauri-utils`. Standardowa konfiguracja Tauri stosuje WebView2 z lokalnym frontendem. Profil demo uruchamia lokalny frontend na porcie 1421 i używa osobnego identyfikatora aplikacji. Zasady Windows pozostały bez zmian.
 
 ## Aplikacja Windows i renderery
 
@@ -61,7 +63,8 @@ Próba pomocnicza w Chrome z ręcznie wczytanym PDF PowerPointa dała 5,9 s do p
 ## Regresja i decyzja
 
 - `npm run test:prezentacje` — 55/55.
+- Testy przeglądarkowe — 6/6 w dwóch przebiegach. W pierwszym przeszły test eksportu i test z PowerPointem. Równoległy bezpośredni render zapisał pliki w katalogu obserwowanym przez Vite. Błąd `EBUSY` zatrzymał serwer i przerwał pozostałe scenariusze. Po wyłączeniu obserwacji plików w tymczasowej konfiguracji Vite przeszły pozostałe cztery scenariusze, w tym druk dla 292 slajdów, edycja, historia, skalowanie, dotyk i pamięć podręczna PDF.
 - `npm test`, `npm run lint`, `npm run build`, `git diff --check` — zaliczone. Vite zgłasza ostrzeżenie o rozmiarze pakietu.
-- `cargo check` — blokada Windows Code Integrity 4551.
+- `cargo check` i uruchomienie aktualnego Tauri — blokada Windows Code Integrity 4551. Test integracyjny demo zakończył się bez działającego okna.
 
-**Integracja wstrzymana.** Warunki odbioru wymagają stanowiska Windows, na którym zasady Code Integrity dopuszczają uzgodnione artefakty budowania Rust. Po udanej kompilacji należy uruchomić bieżące Tauri z rzeczywistym wywołaniem Rust, sprawdzić pełny przepływ edycji PPTX i zapisać trzy formaty dla obu orientacji. Warianty B i C wymagają dodatkowo stanowisk o odpowiedniej dostępności lokalnych rendererów. Zastane zmiany pozostają lokalnie i poza indeksem.
+**Integracja wstrzymana.** Warunki odbioru wymagają stanowiska Windows, na którym zasady Code Integrity dopuszczają uzgodnione artefakty budowania Rust. Po udanej kompilacji należy uruchomić bieżące Tauri z rzeczywistym wywołaniem Rust, sprawdzić pełny przepływ edycji PPTX i zapisać trzy formaty dla obu orientacji. Warianty B i C wymagają dodatkowo stanowisk o odpowiedniej dostępności lokalnych rendererów.

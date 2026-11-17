@@ -171,7 +171,8 @@ export default function WidokPoprawiaczaPrezentacji() {
             <p className="narzedzia__opis">Dalsze przygotowanie materiałów jest dostępne w panelu Eksport i druk.</p>
           </section>}
           <PanelPrzygotowania key={dane.model ? dane.prezentacja?.nazwa : 'okladka'} model={dane.model} czyZajety={czyZajety} ustawZajety={ustawCzyPrzygotowanie}
-            daneOkladki={daneOkladki} ustawDaneOkladki={ustawDaneOkladki} zmienModel={(model) => zapiszOperacje(model, 'Przygotowanie SEMPER')} />
+            nazwaPliku={dane.prezentacja?.nazwa ?? 'Prezentacja.pptx'} daneOkladki={daneOkladki} ustawDaneOkladki={ustawDaneOkladki}
+            zmienModel={(model, operacja) => zapiszOperacje(model, operacja ?? 'Przygotowanie SEMPER')} />
         </div>
         {!dane.model && <div className="narzedzia__panel"><p>Podgląd pojawi się po przeanalizowaniu prezentacji.</p></div>}
 

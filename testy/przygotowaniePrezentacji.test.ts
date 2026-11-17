@@ -5,6 +5,7 @@ import JSZip from 'jszip'
 import { DOMParser, XMLSerializer } from '@xmldom/xmldom'
 import { otworzPptx } from '../src/moduly/narzedzia/poprawiacz_prezentacji/pptx/otworzPptx'
 import { korygujUklad } from '../src/moduly/narzedzia/poprawiacz_prezentacji/operacje/korygujUklad'
+import { dopasujGrafiki } from '../src/moduly/narzedzia/poprawiacz_prezentacji/operacje/dopasujGrafiki'
 import { zastosujMapowanie, zaproponujMapowanie, pusteDaneOkladki } from '../src/moduly/narzedzia/poprawiacz_prezentacji/operacje/mapowanieDanych'
 import { wypelnijSzablonOkladki } from '../src/moduly/narzedzia/poprawiacz_prezentacji/operacje/okladkiSemper'
 import { przygotujPlanDruku, domyslneUstawieniaDruku, dopasujProporcjonalnie, obszaryNaStronie, odczytajZakresSlajdow } from '../src/moduly/narzedzia/poprawiacz_prezentacji/eksport/planDruku'
@@ -16,6 +17,86 @@ import { ksztaltTestowy, utworzFixturePptx, xmlSlajdu, przestrzenRelacji, przest
 
 Object.defineProperty(globalThis, 'DOMParser', { value: DOMParser, configurable: true })
 Object.defineProperty(globalThis, 'XMLSerializer', { value: XMLSerializer, configurable: true })
+
+function obrazTestowy(y: number, cy: number, opcje = '', x = 500000, cx = 9000000) {
+  return `<p:pic><p:nvPicPr><p:cNvPr id="42" name="Zrzut ekranu"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rId2"/><a:srcRect l="1000"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr><a:xfrm${opcje}><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr></p:pic>`
+}
+
+async function prezentacjaDoDopasowania(obiekty: string, innyUklad?: string) {
+  const archiwum = await JSZip.loadAsync(await utworzFixturePptx())
+  const uklad = (typ: string, pasy: string) =>
+    xmlSlajdu(pasy).replace('<p:sld ', `<p:sldLayout type="${typ}" `).replace('</p:sld>', '</p:sldLayout>')
+  const ksztalty = ksztaltTestowy(8, 0, 0, 10000000, 350000) + ksztaltTestowy(9, 0, 5650000, 10000000, 350000, '1')
+  archiwum.file('ppt/slideLayouts/slideLayout1.xml', uklad('obj', ksztalty))
+  archiwum.file('ppt/slides/slide3.xml', xmlSlajdu(obiekty))
+  archiwum.file('ppt/slides/slide1.xml', xmlSlajdu(innyUklad ?? ''))
+  if (innyUklad) {
+    archiwum.file('ppt/slideLayouts/slideLayout2.xml', uklad('title', ksztalty))
+    const sciezka = 'ppt/slides/_rels/slide1.xml.rels'
+    archiwum.file(sciezka, (await archiwum.file(sciezka)!.async('string')).replace('slideLayout1.xml', 'slideLayout2.xml'))
+  }
+  const relacje = 'ppt/slides/_rels/slide3.xml.rels'
+  archiwum.file(relacje, (await archiwum.file(relacje)!.async('string')).replace('</Relationships>',
+    `<Relationship Id="rId2" Type="${przestrzenRelacji}/image" Target="../media/image1.bin"/></Relationships>`))
+  return otworzPptx(await archiwum.generateAsync({ type: 'arraybuffer' }))
+}
+
+test('dopasowanie między pasami zachowuje kadr, proporcje, media i kolejność; okładka ma własny układ', async () => {
+  const metadaneDpi = '<a:extLst><a:ext uri="{28A0092B-C50C-407E-A947-70E740481C1C}"><a14:useLocalDpi xmlns:a14="http://schemas.microsoft.com/office/drawing/2010/main" val="0"/></a:ext></a:extLst>'
+  const obraz = obrazTestowy(0, 5900000).replace('<a:blip r:embed="rId2"/>', `<a:blip r:embed="rId2">${metadaneDpi}</a:blip>`)
+  const model = await prezentacjaDoDopasowania(obraz, obrazTestowy(0, 6000000, '', 0, 10000000))
+  const wynik = await dopasujGrafiki(model)
+  const [korekta, okladka] = wynik.wpisy
+  assert.equal(korekta.status, 'poprawione')
+  assert.ok(korekta.po!.y >= 422000)
+  assert.ok(korekta.po!.y + korekta.po!.cy <= 5578000)
+  assert.ok(Math.abs(korekta.po!.cx / korekta.po!.cy - 9000000 / 5900000) < .000001)
+  assert.equal(okladka.status, 'celowo pełnoekranowe')
+  assert.deepEqual(wynik.model.slajdy.map((slajd) => slajd.czesc), model.slajdy.map((slajd) => slajd.czesc))
+  const pakiet = await JSZip.loadAsync(wynik.model.buforZrodlowy, { checkCRC32: true })
+  for (const plik of Object.values(model.archiwum.files).filter((plik) => !plik.dir && plik.name !== model.slajdy[0].czesc)) {
+    assert.deepEqual(await pakiet.file(plik.name)!.async('uint8array'), await plik.async('uint8array'))
+  }
+  const xml = await pakiet.file(model.slajdy[0].czesc)!.async('string')
+  assert.match(xml, /<a:srcRect l="1000"\/>/)
+  assert.ok(xml.includes(metadaneDpi))
+})
+
+test('kolizja ze stopką wymaga tylko minimalnego przesunięcia; powtórzenie zachowuje identyczny plik', async () => {
+  const wynik = await dopasujGrafiki(await prezentacjaDoDopasowania(obrazTestowy(4900000, 900000)))
+  assert.deepEqual(wynik.wpisy[0].po, { x: 500000, y: 4678000, cx: 9000000, cy: 900000 })
+  const powtorzenie = await dopasujGrafiki(wynik.model)
+  assert.equal(powtorzenie.wpisy[0].status, 'już poprawne')
+  assert.equal(powtorzenie.model, wynik.model)
+})
+
+test('brak miejsca przy tytule, obrócony kadr i ryzyko nieczytelności wymagają oceny', async () => {
+  const tytul = ksztaltTestowy(32, 0, 0, 10000000, 4200000, 'Tytuł')
+    .replace('<p:nvPr/>', '<p:nvPr><p:ph type="title"/></p:nvPr>')
+  const stopka = ksztaltTestowy(33, 0, 4700000, 10000000, 1300000, 'Stopka')
+    .replace('<p:nvPr/>', '<p:nvPr><p:ph type="ftr"/></p:nvPr>')
+  for (const obiekty of [
+    tytul + obrazTestowy(200000, 4000000),
+    obrazTestowy(200000, 4000000, ' rot="1800000"'),
+    stopka + obrazTestowy(0, 5900000),
+  ]) {
+    const model = await prezentacjaDoDopasowania(obiekty)
+    const wynik = await dopasujGrafiki(model)
+    assert.equal(wynik.wpisy[0].status, 'wymaga oceny')
+    assert.equal(wynik.model, model)
+  }
+})
+
+test('korekta grupy zachowuje położenie i proporcje elementów wewnętrznych', async () => {
+  const dzieci = ksztaltTestowy(32, 200000, 100000, 300000, 300000) + ksztaltTestowy(33, 700000, 100000, 400000, 500000)
+  const grupa = `<p:grpSp><p:nvGrpSpPr><p:cNvPr id="31" name="Schemat"/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="500000" y="0"/><a:ext cx="9000000" cy="5900000"/><a:chOff x="0" y="0"/><a:chExt cx="9000000" cy="5900000"/></a:xfrm></p:grpSpPr>${dzieci}</p:grpSp>`
+  const model = await prezentacjaDoDopasowania(grupa)
+  const wynik = await dopasujGrafiki(model)
+  assert.equal(wynik.wpisy[0].status, 'poprawione')
+  const serializer = new XMLSerializer()
+  const elementy = (prezentacja: typeof model) => prezentacja.slajdy[0].obiekty.slice(1).map((obiekt) => serializer.serializeToString(obiekt.element))
+  assert.deepEqual(elementy(wynik.model), elementy(model))
+})
 
 async function utworzLiczbeSlajdow(liczba: number) {
   const archiwum = await JSZip.loadAsync(await utworzFixturePptx())

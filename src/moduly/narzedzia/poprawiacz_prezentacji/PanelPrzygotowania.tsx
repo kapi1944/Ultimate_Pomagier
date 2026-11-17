@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react'
 import type { ModelPptx } from './pptx/modelPptx'
 import { korygujUklad } from './operacje/korygujUklad'
+import { dopasujGrafiki } from './operacje/dopasujGrafiki'
+import { nazwaPoprawionejPrezentacji, pobierzKopiePptx, zapiszPptx } from './pptx/zapiszPptx'
 import { analizujUklad } from './analiza/analizujUklad'
 import { zastosujMapowanie, daneOkladkiZeSzczegolow, etykietyPol, wartoscPola, zaproponujMapowanie } from './operacje/mapowanieDanych'
 import type { DaneOkladki, MapowaniePola, PolePrezentacji } from './operacje/mapowanieDanych'
 import { pobierzSzczegolyDoGeneratorow } from '../../../wspolne/integracje/szczegolyDoDokumentow/pobierzSzczegolyDoGeneratorow'
 
-type Wlasciwosci = { model: ModelPptx | null; czyZajety: boolean; ustawZajety: (wartosc: boolean) => void; zmienModel: (model: ModelPptx) => Promise<void> | void; daneOkladki: DaneOkladki; ustawDaneOkladki: (dane: DaneOkladki) => void }
+type Wlasciwosci = { model: ModelPptx | null; nazwaPliku: string; czyZajety: boolean; ustawZajety: (wartosc: boolean) => void; zmienModel: (model: ModelPptx, operacja?: string) => Promise<void> | void; daneOkladki: DaneOkladki; ustawDaneOkladki: (dane: DaneOkladki) => void }
 
-export default function PanelPrzygotowania({ model, czyZajety, ustawZajety, zmienModel, daneOkladki, ustawDaneOkladki }: Wlasciwosci) {
+export default function PanelPrzygotowania({ model, nazwaPliku, czyZajety, ustawZajety, zmienModel, daneOkladki, ustawDaneOkladki }: Wlasciwosci) {
+  const [raportGrafik, ustawRaportGrafik] = useState<Awaited<ReturnType<typeof dopasujGrafiki>> | null>(null)
   const [szerokosc, ustawSzerokosc] = useState(model ? model.slajdy[0].szerokosc / 360000 : 33.867)
   const [wysokosc, ustawWysokosc] = useState(model ? model.slajdy[0].wysokosc / 360000 : 19.05)
   const [czyKorekta, ustawCzyKorekta] = useState(true)
@@ -40,6 +43,32 @@ export default function PanelPrzygotowania({ model, czyZajety, ustawZajety, zmie
   }
 
   return <>
+    {model && <section className="narzedzia__panel" aria-labelledby="poprawiacz-grafiki">
+      <h2 id="poprawiacz-grafiki">Bezpieczne dopasowanie grafik</h2>
+      <button type="button" disabled={czyZajety} onClick={() => void wykonaj(async () => {
+        ustawRaportGrafik(null)
+        const wynik = await dopasujGrafiki(model)
+        if (wynik.zmienioneSlajdy) await zmienModel(wynik.model, 'Bezpieczne dopasowanie grafik')
+        ustawRaportGrafik(wynik)
+      })}>Dopasuj grafiki do obszaru slajdu</button>
+      {raportGrafik && <>
+        <p role="status">Przebadano {raportGrafik.slajdy} slajdów i {raportGrafik.wpisy.length} grafik lub grup.
+          Wykryto {raportGrafik.wpisy.filter((wpis) => wpis.czyKolizja).length} kolizji.
+          Poprawiono {raportGrafik.wpisy.filter((wpis) => wpis.po).length} grafik na {raportGrafik.zmienioneSlajdy} slajdach.
+          Do oceny: {raportGrafik.wpisy.filter((wpis) => wpis.status === 'wymaga oceny').length}.</p>
+        {raportGrafik.zmienioneSlajdy > 0 && <>
+          <p>Sprawdzono integralność pakietu. Porównaj wygląd slajdów przed i po korekcie w trybie porównawczym.</p>
+          <button type="button" disabled={czyZajety} onClick={() => void wykonaj(async () =>
+            pobierzKopiePptx(await zapiszPptx(raportGrafik.model), nazwaPliku))}>Pobierz {nazwaPoprawionejPrezentacji(nazwaPliku)}</button>
+        </>}
+        <details><summary>Raport dopasowania grafik — {nazwaPliku}</summary>
+          <ul>{raportGrafik.wpisy.map((wpis, indeks) => <li key={indeks}>
+            Slajd {wpis.slajd}, {wpis.nazwa} ({wpis.id}) — {wpis.status}. {wpis.przyczyna}
+            {wpis.po && <> Przed: {JSON.stringify(wpis.przed)}. Po: {JSON.stringify(wpis.po)}. Skala: {wpis.skala?.toLocaleString('pl-PL', { style: 'percent' })}.</>}
+          </li>)}</ul>
+        </details>
+      </>}
+    </section>}
     {model && <section className="narzedzia__panel" aria-labelledby="poprawiacz-uklad">
       <h2 id="poprawiacz-uklad">Wymiary i korekta układu</h2>
       <p>Aktualny slajd: {(model.slajdy[0].szerokosc / 360000).toLocaleString('pl-PL', { maximumFractionDigits: 3 })} × {(model.slajdy[0].wysokosc / 360000).toLocaleString('pl-PL', { maximumFractionDigits: 3 })} cm.</p>
