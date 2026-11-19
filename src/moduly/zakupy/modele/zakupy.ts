@@ -114,6 +114,8 @@ export type PozycjaPrzesylki = {
 
 export type TypLokalizacjiMagazynowej = 'OBIEKT' | 'STREFA' | 'REGAL' | 'POLKA' | 'POZYCJA'
 export type ProstokatMapy = { x: number; y: number; szerokosc: number; wysokosc: number }
+// Opis wyglądu mebla do widoku elewacji. Pola opcjonalne, więc zapis v2 pozostaje zgodny wstecz.
+export type WygladMebla = { rodzaj: 'REGAL' | 'SZAFA'; sekcje: number }
 
 export type LokalizacjaMagazynowa = {
   id: string
@@ -127,6 +129,9 @@ export type LokalizacjaMagazynowa = {
   opis?: string
   zdjecie?: string
   polozenieNaMapie?: ProstokatMapy
+  // Tylko dla mebla (regał/szafa): wygląd w elewacji. Tylko dla półki: numer sekcji mebla, od 1.
+  wyglad?: WygladMebla
+  sekcja?: number
 }
 
 export type LokalizacjaMapy = LokalizacjaMagazynowa & {

@@ -7,7 +7,9 @@ import { dodajPolki, duplikujStruktureLokalizacji, normalizujLokalizacjeMapy, po
 import { przypiszProduktDoLokalizacji, type PrzypisanieMagazynowe } from '../logika/przypisaniaMagazynowe'
 import { czyZmianaPoziomuPlanu, odczytajWpisNawigacjiMapy, zbudujStanHistoriiMapy, zweryfikujPolozenieMapy, type PolozenieMapy } from '../logika/nawigacjaMapyMagazynu'
 import { useOchronaNiezapisanegoDokumentu } from '../../dokumenty/wspolne/useStanDokumentu'
+import { dodajUkladLewejSciany } from '../logika/elewacjaMagazynu'
 import PlanMagazynu from './PlanMagazynu'
+import ElewacjaMagazynu from './ElewacjaMagazynu'
 import EdytorLokalizacji from './EdytorLokalizacji'
 import DrzewoLokalizacji from './DrzewoLokalizacji'
 import KreatorLokalizacji from './KreatorLokalizacji'
@@ -35,6 +37,7 @@ export default function WidokMapyMagazynu({ dane, uzytkownik, odswiez }: { dane:
   const [indeksHistorii, ustawIndeksHistorii] = useState(poczatkoweNawigowanie.indeks)
   const [maksymalnyIndeks, ustawMaksymalnyIndeks] = useState(poczatkoweNawigowanie.indeks)
   const [czyEdycja, ustawEdycje] = useState(false)
+  const [widokMapy, ustawWidokMapy] = useState<'plan' | 'elewacja'>('plan')
   const [fraza, ustawFraze] = useState('')
   const [produktId, ustawProdukt] = useState('')
   const [komunikat, ustawKomunikat] = useState('')
@@ -175,6 +178,18 @@ export default function WidokMapyMagazynu({ dane, uzytkownik, odswiez }: { dane:
       ustawBlad(null)
     } catch (przyczyna) { ustawBlad(przyczyna instanceof Error ? przyczyna.message : 'Nie zmieniono struktury.') }
   }
+  function utworzUkladLewejSciany() {
+    if (!czyEdycja || !czyMozeEdytowac) return
+    if (czyPolaNiezapisane) { ustawBlad('Najpierw zastosuj edycję lokalizacji.'); return }
+    try {
+      const wynik = dodajUkladLewejSciany(lokalizacje)
+      ustawWidokMapy('elewacja')
+      ustawBlad(null)
+      if (!wynik.dodano.length) { ustawKomunikat('Układ lewej ściany już istnieje — nic nie dodano.'); return }
+      ustawLokalizacje(wynik.lokalizacje)
+      ustawKomunikat(`Dodano: ${wynik.dodano.join(', ')}${wynik.pominieto.length ? `. Pominięto istniejące: ${wynik.pominieto.join(', ')}` : ''}. Zapisz konfigurację, aby utrwalić układ.`)
+    } catch (przyczyna) { ustawBlad(przyczyna instanceof Error ? przyczyna.message : 'Nie utworzono układu lewej ściany.') }
+  }
   function przypisz(operacja: PrzypisanieMagazynowe) {
     if (!czyEdycja || !czyMozeEdytowac || !uzytkownik) return false
     try { ustawDaneMagazynowe(przypiszProduktDoLokalizacji(daneMagazynowe, lokalizacje, operacja, uzytkownik.id)); ustawBlad(null); return true }
@@ -226,7 +241,7 @@ export default function WidokMapyMagazynu({ dane, uzytkownik, odswiez }: { dane:
     <p role="status">{czyWczytywanie ? 'Wczytywanie zdjęcia…' : (czyNiezapisane || czyFormularzeNiezapisane) ? 'Niezapisane zmiany mapy.' : komunikat}</p>
     <div className="zakupy__nawigacja">
       {czyMozeEdytowac && !czyEdycja && <button type="button" disabled={Boolean(konfiguracja.blad)} onClick={() => ustawEdycje(true)}>Edytuj plan</button>}
-      {czyEdycja && <><button type="button" onClick={zapisz} disabled={czyWczytywanie}>Zapisz konfigurację</button><button type="button" onClick={wczytajPlan} disabled={czyWczytywanie}>Anuluj edycję</button><button type="button" disabled={czyWczytywanie} onClick={dodaj}>Dodaj lokalizację w tym planie</button></>}
+      {czyEdycja && <><button type="button" onClick={zapisz} disabled={czyWczytywanie}>Zapisz konfigurację</button><button type="button" onClick={wczytajPlan} disabled={czyWczytywanie}>Anuluj edycję</button><button type="button" disabled={czyWczytywanie} onClick={dodaj}>Dodaj lokalizację w tym planie</button><button type="button" disabled={czyWczytywanie} onClick={utworzUkladLewejSciany}>Utwórz układ lewej ściany</button></>}
       <button type="button" onClick={wczytajPlan} disabled={czyWczytywanie}>Wczytaj zapisany plan</button>
     </div>
     {czyEdycja && <p>Przeciągnij element lub uchwyt ↘. Strzałki przesuwają zaznaczony obiekt. Pozycja na mapie nie zmienia adresu. Edycję pól zatwierdź przyciskiem „Zastosuj edycję lokalizacji”, a następnie zapisz konfigurację.</p>}
@@ -250,9 +265,13 @@ export default function WidokMapyMagazynu({ dane, uzytkownik, odswiez }: { dane:
       <button type="button" disabled={czyPolaNiezapisane} aria-current={!rodzicId ? 'location' : undefined} onClick={() => przejdz({ rodzicId: null, wybranaId: null })}>Obiekty</button>
       {(rodzicId ? pobierzSciezkeLokalizacji(lokalizacje, rodzicId) : []).map((id) => <button key={id} type="button" disabled={czyPolaNiezapisane} aria-current={rodzicId === id ? 'location' : undefined} onClick={() => przejdz({ rodzicId: id, wybranaId: null })}>{lokalizacje.find((lokalizacja) => lokalizacja.id === id)?.nazwa}</button>)}
     </nav>
+    <div className="mapa-magazynu__widoki" role="group" aria-label="Widok mapy">
+      <button type="button" aria-pressed={widokMapy === 'plan'} onClick={() => ustawWidokMapy('plan')}>Plan 2D</button>
+      <button type="button" aria-pressed={widokMapy === 'elewacja'} onClick={() => ustawWidokMapy('elewacja')}>Elewacja — regały i szafy</button>
+    </div>
     <div className="mapa-magazynu__uklad">
       <DrzewoLokalizacji lokalizacje={lokalizacje} stany={daneMagazynowe.stanyWLokalizacjach} wybranaId={wybranaId} fraza={frazaLokalizacji} ustawFraze={ustawFrazeLokalizacji} wybierz={wybierzLokalizacje} dodaj={otworzKreator} czyEdycja={czyEdycja && czyMozeEdytowac && !czyWczytywanie} />
-      <div className="mapa-magazynu__obszar"><PlanMagazynu dane={daneMapy} rodzicId={rodzicId} wybranaId={wybranaId} podswietloneId={podswietlone} czyFiltr={Boolean(produktId || frazaLokalizacji)} czyEdycja={czyEdycja && czyMozeEdytowac && !czyWczytywanie && !czyPolaNiezapisane} wybierz={wybierzLokalizacje} wejdz={wejdzDoLokalizacji} zmienProstokat={zmienProstokat} /></div>
+      <div className="mapa-magazynu__obszar">{widokMapy === 'elewacja' ? <ElewacjaMagazynu lokalizacje={lokalizacje} stany={daneMagazynowe.stanyWLokalizacjach} wybranaId={wybranaId} podswietloneId={podswietlone} czyFiltr={Boolean(produktId || frazaLokalizacji)} wybierz={wybierzLokalizacje} /> : <PlanMagazynu dane={daneMapy} rodzicId={rodzicId} wybranaId={wybranaId} podswietloneId={podswietlone} czyFiltr={Boolean(produktId || frazaLokalizacji)} czyEdycja={czyEdycja && czyMozeEdytowac && !czyWczytywanie && !czyPolaNiezapisane} wybierz={wybierzLokalizacje} wejdz={wejdzDoLokalizacji} zmienProstokat={zmienProstokat} />}</div>
       <aside className="mapa-magazynu__szczegoly" aria-label="Szczegóły lokalizacji">
         {wybrana ? <>
           <h3>{wybrana.pelnyKod} — {wybrana.nazwa}</h3>

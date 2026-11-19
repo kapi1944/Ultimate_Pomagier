@@ -184,6 +184,7 @@ Właściciel pliku obejmuje wszystkie warunki renderowania, stany pusty/błąd/�
 | `src/moduly/zakupy/magazyn/KreatorLokalizacji.tsx` | V4-19 | — | — | 1 |
 | `src/moduly/zakupy/magazyn/SelektorLokalizacji.tsx` | V4-19 | — | — | 0 |
 | `src/moduly/zakupy/magazyn/EdytorLokalizacji.tsx` | V4-19 | — | — | 1 |
+| `src/moduly/zakupy/magazyn/ElewacjaMagazynu.tsx` | V4-19 | — | — | 0 |
 | `src/moduly/zakupy/magazyn/PlanMagazynu.tsx` | V4-19 | — | — | 0 |
 | `src/moduly/zakupy/magazyn/WidokMapyMagazynu.tsx` | V4-19 | — | — | 3 |
 | `src/moduly/zakupy/magazyn/WidokStanowMagazynowych.tsx` | V4-19 | — | — | 1 |

@@ -1075,6 +1075,12 @@
       "ukonczoneEtapy": [],
       "wspoldzieloneZ": []
     },
+    "src/moduly/zakupy/magazyn/ElewacjaMagazynu.tsx": {
+      "zadanie": "V4-19",
+      "powierzchnie": [],
+      "ukonczoneEtapy": [],
+      "wspoldzieloneZ": []
+    },
     "src/moduly/zakupy/magazyn/PlanMagazynu.tsx": {
       "zadanie": "V4-19",
       "powierzchnie": [],
