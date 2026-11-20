@@ -57,6 +57,8 @@ test('scalona lista jest pamiętana dla tego samego zapisu i odświeżana po ka�
   assert.equal(kartoteka.pobierzLokalizacjeZMagazynu(), pierwsza, 'ten sam zapis powinien zwracać tę samą listę')
 
   const wzor = startowa[0]
+  const pierwotnyMiejscownik = wzor.miejscownik_pelny_auto
+  const pierwotnyStatus = wzor.status_odmiany
   const potwierdzona = kartoteka.ustawPotwierdzonyMiejscownikLokalizacji(wzor.klucz_lokalizacji, ' Nowym Miejscowniku ')
   assert.equal(potwierdzona?.miejscownik_pelny_auto, 'Nowym Miejscowniku')
   assert.equal(potwierdzona?.status_odmiany, true)
@@ -65,7 +67,9 @@ test('scalona lista jest pamiętana dla tego samego zapisu i odświeżana po ka�
   assert.notEqual(poZmianie, pierwsza)
   assert.equal(poZmianie.length, startowa.length)
   assert.equal(kartoteka.znajdzLokalizacjePoKluczu(wzor.klucz_lokalizacji, poZmianie)?.miejscownik_pelny_auto, 'Nowym Miejscowniku')
-  assert.equal(startowa[0].miejscownik_pelny_auto, wzor.miejscownik_pelny_auto, 'dane startowe nie mogą być modyfikowane')
+  assert.equal(startowa[0].miejscownik_pelny_auto, pierwotnyMiejscownik, 'dane startowe nie mogą być modyfikowane')
+  assert.equal(startowa[0].status_odmiany, pierwotnyStatus, 'status danych startowych nie może być modyfikowany')
+  assert.notEqual(pierwotnyMiejscownik, 'Nowym Miejscowniku')
   assert.deepEqual(kartoteka.pobierzPotwierdzonyMiejscownikLokalizacji(wzor.klucz_lokalizacji), { miejscownik: 'Nowym Miejscowniku', blad: null })
 
   const zapisane = JSON.parse(magazyn.get(kluczLokalizacji) ?? '[]') as unknown[]
