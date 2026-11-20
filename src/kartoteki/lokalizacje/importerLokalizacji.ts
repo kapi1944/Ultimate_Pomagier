@@ -16,6 +16,11 @@ function zdejmijBom(tresc: string) {
 }
 
 function parsujWierszCsv(wiersz: string) {
+  // Szybka ścieżka: bez cudzysłowów separator zawsze rozdziela pola, więc wynik jest taki sam jak w pętli poniżej.
+  if (!wiersz.includes('"')) {
+    return wiersz.split(',').map((wartosc) => wartosc.trim())
+  }
+
   const pola: string[] = []
   let pole = ''
   let czyWCudzyslowie = false

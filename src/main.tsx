@@ -6,6 +6,17 @@ import './wspolne/komponenty/tokeny.css'
 import { pobierzUstawieniaAplikacji, zastosujUstawieniaAplikacji } from './aplikacja/ustawienia/magazynUstawienAplikacji'
 import { zastosujSkaleInterfejsu, zarejestrujSkrotySkaliInterfejsu } from './aplikacja/ustawienia/skalaInterfejsu'
 
+// Kartoteka miejscowości jest duża, więc jej przygotowanie odkładamy do czasu bezczynności po pierwszym renderze.
+function zaplanujRozgrzewkeKartotekiLokalizacji() {
+  const rozgrzej = () => {
+    import('./kartoteki/lokalizacje/magazynLokalizacji')
+      .then(({ rozgrzejKartotekeLokalizacji }) => rozgrzejKartotekeLokalizacji())
+      .catch((blad: unknown) => { console.warn('Nie udało się wstępnie przygotować kartoteki lokalizacji.', blad) })
+  }
+  if (typeof window.requestIdleCallback === 'function') window.requestIdleCallback(rozgrzej, { timeout: 3000 })
+  else window.setTimeout(rozgrzej, 1500)
+}
+
 async function uruchomAplikacje() {
   await przygotujDaneDesktop()
   const { default: App } = await import('./App.tsx')
@@ -19,6 +30,7 @@ async function uruchomAplikacje() {
       <App />
     </StrictMode>,
   )
+  zaplanujRozgrzewkeKartotekiLokalizacji()
 }
 
 void uruchomAplikacje().catch((blad: unknown) => {
