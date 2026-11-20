@@ -135,8 +135,8 @@ test('pakiet podstawowy, dodatkowy i wszystkie dokumenty mają właściwy zakres
   const dodatkowy = utworzPakietDokumentow(wersja, rodzajeDokumentowDodatkowych, wersja.autorId)
   const wszystkie = utworzPakietDokumentow(wersja, rodzajeWszystkichDokumentow, wersja.autorId)
 
-  assert.deepEqual(podstawowy.map((wynik) => wynik.rodzaj), ['program', 'lista', 'ankieta', 'dyplomy'])
-  assert.deepEqual(dodatkowy.map((wynik) => wynik.rodzaj), ['karty', 'checklista'])
+  assert.deepEqual(podstawowy.map((wynik) => wynik.rodzaj), ['program', 'lista', 'ankieta', 'dyplomy', 'checklista'])
+  assert.deepEqual(dodatkowy.map((wynik) => wynik.rodzaj), ['karty'])
   assert.ok(wszystkie.every((wynik) => wynik.status === 'istnieje'))
 })
 
@@ -204,7 +204,7 @@ test('błąd jednego dokumentu nie blokuje dalszych pozycji pakietu', () => {
     const wyniki = utworzPakietDokumentow(wersja, rodzajePakietuPodstawowego, wersja.autorId)
     assert.equal(wyniki.find((wynik) => wynik.rodzaj === 'ankieta')?.status, 'blad')
     assert.equal(wyniki.find((wynik) => wynik.rodzaj === 'dyplomy')?.status, 'utworzono')
-    assert.equal(repozytoriumWspolnychDokumentow.pobierzWszystkie().length, 3)
+    assert.equal(repozytoriumWspolnychDokumentow.pobierzWszystkie().length, 4)
   } finally {
     globalThis.localStorage = zwyklyMagazyn
   }
@@ -233,6 +233,8 @@ test('widok udostępnia pojedyncze dokumenty, pakiety, pełne powiązania i istn
 
   assert.match(przygotowanie, /\['program', 'lista', 'ankieta', 'dyplomy', 'karty', 'checklista'\]/)
   assert.match(przygotowanie, /Utwórz pakiet podstawowy/)
+  assert.match(przygotowanie, /szczegoly-dokument-karta--podstawowy/)
+  assert.match(przygotowanie, /<MiniaturaDokumentu/)
   assert.match(przygotowanie, /Utwórz dokumenty dodatkowe/)
   assert.match(przygotowanie, /Utwórz wszystkie dokumenty/)
   assert.match(przygotowanie, /wykonajPakiet\(rodzajeWszystkichDokumentow\)/)

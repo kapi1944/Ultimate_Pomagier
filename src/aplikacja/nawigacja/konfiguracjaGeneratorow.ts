@@ -40,7 +40,6 @@ export const konfiguracjePodmenuGeneratorow: KonfiguracjaPodmenuGeneratora[] = [
       { widok: 'listy-obecnosci', etykieta: 'Nowa lista obecności', sciezka: '/dokumenty/listy-obecnosci' },
       { widok: 'listy_obecnosci_kopie_robocze', etykieta: 'Kopie robocze', sciezka: '/dokumenty/listy-obecnosci/kopie-robocze' },
       { widok: 'listy_obecnosci_wszystkie', etykieta: 'Wszystkie listy obecności', sciezka: '/dokumenty/listy-obecnosci/wszystkie' },
-      { widok: 'listy_obecnosci_kosz', etykieta: 'Kosz', sciezka: '/dokumenty/listy-obecnosci/kosz' },
     ],
   },
   {
@@ -51,7 +50,6 @@ export const konfiguracjePodmenuGeneratorow: KonfiguracjaPodmenuGeneratora[] = [
       { widok: 'ankiety', etykieta: 'Nowa ankieta', sciezka: '/dokumenty/ankiety' },
       { widok: 'ankiety_kopie_robocze', etykieta: 'Kopie robocze', sciezka: '/dokumenty/ankiety/kopie-robocze' },
       { widok: 'ankiety_wszystkie', etykieta: 'Wszystkie ankiety', sciezka: '/dokumenty/ankiety/wszystkie' },
-      { widok: 'ankiety_kosz', etykieta: 'Kosz', sciezka: '/dokumenty/ankiety/kosz' },
     ],
   },
   {
@@ -62,7 +60,6 @@ export const konfiguracjePodmenuGeneratorow: KonfiguracjaPodmenuGeneratora[] = [
       { widok: 'dyplomy', etykieta: 'Nowy dyplom', sciezka: '/dokumenty/dyplomy' },
       { widok: 'dyplomy_kopie_robocze', etykieta: 'Kopie robocze', sciezka: '/dokumenty/dyplomy/kopie-robocze' },
       { widok: 'dyplomy_wszystkie', etykieta: 'Wszystkie dyplomy', sciezka: '/dokumenty/dyplomy/wszystkie' },
-      { widok: 'dyplomy_kosz', etykieta: 'Kosz', sciezka: '/dokumenty/dyplomy/kosz' },
     ],
   },
   {
@@ -73,7 +70,6 @@ export const konfiguracjePodmenuGeneratorow: KonfiguracjaPodmenuGeneratora[] = [
       { widok: 'karta-na-drzwi', etykieta: 'Nowa karta na drzwi', sciezka: '/dokumenty/karta-na-drzwi' },
       { widok: 'karta_na_drzwi_kopie_robocze', etykieta: 'Kopie robocze', sciezka: '/dokumenty/karta-na-drzwi/kopie-robocze' },
       { widok: 'karta_na_drzwi_wszystkie', etykieta: 'Wszystkie karty na drzwi', sciezka: '/dokumenty/karta-na-drzwi/wszystkie' },
-      { widok: 'karta_na_drzwi_kosz', etykieta: 'Kosz', sciezka: '/dokumenty/karta-na-drzwi/kosz' },
     ],
   },
   {
@@ -84,7 +80,6 @@ export const konfiguracjePodmenuGeneratorow: KonfiguracjaPodmenuGeneratora[] = [
       { widok: 'checklisty_paczek', etykieta: 'Nowa checklista paczki', sciezka: '/dokumenty/checklisty-paczek' },
       { widok: 'checklisty_paczek_kopie_robocze', etykieta: 'Kopie robocze', sciezka: '/dokumenty/checklisty-paczek/kopie-robocze' },
       { widok: 'checklisty_paczek_wszystkie', etykieta: 'Wszystkie checklisty paczek', sciezka: '/dokumenty/checklisty-paczek/wszystkie' },
-      { widok: 'checklisty_paczek_kosz', etykieta: 'Kosz', sciezka: '/dokumenty/checklisty-paczek/kosz' },
     ],
   },
   {
@@ -94,7 +89,7 @@ export const konfiguracjePodmenuGeneratorow: KonfiguracjaPodmenuGeneratora[] = [
     pozycje: [
       { widok: 'programy_szkolen', etykieta: 'Nowy program szkolenia', sciezka: '/dokumenty/programy-szkolen' },
       { widok: 'programy_szkolen_kopie_robocze', etykieta: 'Kopie robocze', sciezka: '/dokumenty/programy-szkolen/kopie-robocze' },
-      { widok: 'programy_szkolen_kosz', etykieta: 'Kosz', sciezka: '/dokumenty/programy-szkolen/kosz' },
+      { widok: 'programy_szkolen_wszystkie', etykieta: 'Wszystkie programy szkoleń', sciezka: '/dokumenty/programy-szkolen/wszystkie' },
     ],
   },
 ]

@@ -2,7 +2,7 @@ import { useRef, useState, type PointerEvent } from 'react'
 import type { LokalizacjaMapy, ProstokatMapy, StanZakupow } from '../modele/zakupy'
 import { etykietyProblemow, ograniczProstokat, pobierzProblemyLokalizacji, uporzadkujLokalizacje } from '../logika/mapaMagazynu'
 
-export default function PlanMagazynu({ dane, rodzicId, wybranaId, podswietloneId, czyFiltr, czyEdycja, wybierz, zmienProstokat }: {
+export default function PlanMagazynu({ dane, rodzicId, wybranaId, podswietloneId, czyFiltr, czyEdycja, wybierz, wejdz, zmienProstokat }: {
   dane: Omit<StanZakupow, 'lokalizacjeMagazynowe'> & { lokalizacjeMagazynowe: LokalizacjaMapy[] }
   rodzicId: string | null
   wybranaId: string | null
@@ -10,6 +10,7 @@ export default function PlanMagazynu({ dane, rodzicId, wybranaId, podswietloneId
   czyFiltr: boolean
   czyEdycja: boolean
   wybierz: (id: string) => void
+  wejdz: (id: string) => void
   zmienProstokat: (id: string, prostokat: ProstokatMapy) => void
 }) {
   const plan = useRef<HTMLDivElement>(null)
@@ -63,8 +64,9 @@ export default function PlanMagazynu({ dane, rodzicId, wybranaId, podswietloneId
       return <div key={lokalizacja.id}
         className={`mapa-magazynu__element${czyFiltr && !podswietloneId.has(lokalizacja.id) ? ' mapa-magazynu__element--przygaszony' : ''}${czyFiltr && podswietloneId.has(lokalizacja.id) ? ' mapa-magazynu__element--trafienie' : ''}${!lokalizacja.czyAktywna ? ' mapa-magazynu__element--nieaktywny' : ''}`}
         style={{ left: `${prostokat.x}%`, top: `${prostokat.y}%`, width: `${prostokat.szerokosc}%`, height: `${prostokat.wysokosc}%` }}>
-        <button type="button" className="mapa-magazynu__miejsce" aria-pressed={wybranaId === lokalizacja.id} onClick={() => wybierz(lokalizacja.id)}
+        <button type="button" className="mapa-magazynu__miejsce" aria-pressed={wybranaId === lokalizacja.id} title="Dwuklik: wejdź do środka" onClick={() => wybierz(lokalizacja.id)} onDoubleClick={() => wejdz(lokalizacja.id)}
           onKeyDown={(zdarzenie) => {
+            if (zdarzenie.key === 'Enter' && wybranaId === lokalizacja.id) { zdarzenie.preventDefault(); wejdz(lokalizacja.id); return }
             if (!czyEdycja || !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(zdarzenie.key)) return
             zdarzenie.preventDefault()
             const krok = czySiatka ? 5 : 1

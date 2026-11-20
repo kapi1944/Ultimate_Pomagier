@@ -49,13 +49,13 @@ const zatwierdzoneNazwy = [
 ]
 assert.deepEqual(Object.keys(manifest.zadania), etapy, 'Plan musi zawierać dokładnie 23 etapy.')
 assert.deepEqual(Object.values(manifest.zadania).slice(4), zatwierdzoneNazwy, 'Zatwierdzona numeracja V4-05–23 nie może się rozjechać.')
-assert.equal(widoki.length, 53)
+assert.equal(widoki.length, 48)
 const wlascicieleWidokow = {
   'V4-04': ['pulpit'],
   'V4-05': ['szkolenia-zamkniete', 'szkolenia-otwarte'],
   'V4-06': ['zamkniete_szczegoly_organizacyjne_lista', 'zamkniete_szczegoly_organizacyjne_kopie_robocze'],
   'V4-07': ['generator-szczegolow', 'zamkniete_szczegoly_organizacyjne_nowe'],
-  'V4-08': widoki.filter((id) => id.startsWith('dokumenty') || !id.startsWith('zamkniete_') && /_kopie_robocze$|_kosz$|_wszystkie$/.test(id)),
+  'V4-08': widoki.filter((id) => id.startsWith('dokumenty') || !id.startsWith('zamkniete_') && /_kopie_robocze$|_wszystkie$/.test(id)),
   'V4-10': ['programy_szkolen'], 'V4-11': ['listy-obecnosci'], 'V4-12': ['ankiety'],
   'V4-13': ['dyplomy'], 'V4-14': ['karta-na-drzwi'], 'V4-15': ['checklisty_paczek'],
   'V4-16': ['replikator_dokumentow'], 'V4-17': ['narzedzia', 'poprawiacz_prezentacji'],

@@ -48,3 +48,20 @@
   .mapa-magazynu__uklad { grid-template-columns: minmax(0, 1fr); }
   .mapa-magazynu__drzewo { max-height: 50vh; }
 }
+.elewacja__sciana { position: relative; background: var(--ui-pole); border-bottom: 6px solid var(--ui-obramowanie); }
+.elewacja__mebel { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; box-sizing: border-box; min-width: 0; border: 2px solid var(--ui-obramowanie); border-radius: 4px; background: var(--ui-powierzchnia); }
+.elewacja__mebel--nieaktywny { border-style: dashed; }
+.elewacja__mebel--przygaszony { opacity: .45; }
+.mapa-magazynu .elewacja__naglowek { flex: 0 0 auto; min-height: 32px; padding: 2px 4px; font-weight: 700; font-size: .8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-radius: 0; }
+.elewacja__naglowek[aria-pressed="true"] { outline: 3px solid var(--ui-tekst); outline-offset: -3px; }
+.elewacja__sekcje { flex: 1 1 auto; display: flex; min-height: 0; gap: 3px; padding: 3px; }
+.elewacja__sekcja { flex: 1 1 0; display: flex; flex-direction: column; min-width: 0; gap: 2px; border-inline: 3px solid var(--ui-obramowanie); }
+.mapa-magazynu .elewacja__polka { flex: 1 1 0; min-height: 22px; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 2px; padding: 0 4px; font-size: .7rem; line-height: 1; white-space: nowrap; overflow: hidden; border-radius: 2px; border-bottom: 4px solid var(--ui-tekst-drugi); background: var(--ui-pole); }
+.elewacja__polka span { overflow: hidden; text-overflow: ellipsis; }
+.elewacja__polka small { flex: 0 0 auto; padding: 0 4px; border-radius: 8px; background: var(--ui-akcent-mocny); font-size: .65rem; }
+.elewacja__polka[aria-pressed="true"] { outline: 3px solid var(--ui-tekst); outline-offset: -2px; }
+.elewacja__polka--trafienie { box-shadow: 0 0 0 3px var(--ui-akcent-mocny); border-color: var(--ui-tekst); }
+.elewacja__polka--przygaszona { opacity: .4; }
+.elewacja__polka--nieaktywna { border-style: dashed; }
+.elewacja__drzwi { position: absolute; inset: 36px 3px 3px; pointer-events: none; border: 2px solid var(--ui-tekst-drugi); border-radius: 3px; background: linear-gradient(to right, transparent calc(50% - 1px), var(--ui-tekst-drugi) calc(50% - 1px), var(--ui-tekst-drugi) calc(50% + 1px), transparent calc(50% + 1px)); opacity: .35; }
+.mapa-magazynu__widoki { display: flex; flex-wrap: wrap; gap: 8px; }

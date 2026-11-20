@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { isTauri } from '@tauri-apps/api/core'
 import { useKontekstUzytkownika } from '../../../aplikacja/logowanie/useKontekstUzytkownika'
 import type { AkcjaPoprawiacza, DanePoprawiacza, TrybPrezentacji } from './modele/stanPoprawiacza'
 import type { ModelPptx, SlajdPptx } from './pptx/modelPptx'
@@ -10,12 +9,12 @@ import { porownajPrezentacje, tozsamoscObiektu } from './operacje/porownaniePrez
 import { czyEdytowalny, edytujSlajd, type ZmianaObiektu } from './operacje/edycjaPrezentacji'
 import { normalizujKolorRoznic, pobierzKolorRoznic, zapiszKolorRoznic } from './modele/preferencjePodgladu'
 import { porownajPiksele } from './operacje/porownaniePikseli'
-import { otworzPdfPrezentacji, renderujStronePdf, renderujPptxDoPdf, sprawdzPdfPrezentacji } from './eksport/renderowaniePdf'
+import { czyPlatformaRenderujePptx, otworzPdfPrezentacji, renderujStronePdf, renderujPptxDoPdf, sprawdzPdfPrezentacji } from './eksport/renderowaniePdf'
 import PodgladSlajdu, { type PamiecPodgladu } from './PodgladSlajdu'
 import PodgladStrukturalny from './PodgladStrukturalny'
 import WlasciwosciObiektu from './WlasciwosciObiektu'
 
-export type RenderPodgladu = { model: ModelPptx; bufor: ArrayBuffer; uwagi: string[]; klucz?: number }
+export type RenderPodgladu = { model: ModelPptx; bufor: ArrayBuffer; uwagi: string[]; klucz?: number; silnik?: 'PowerPoint' | 'LibreOffice' }
 
 export default function TrybyPrezentacji({ dane, wyslij, zapisz, historia, czyZajety, ustawZajety, rendery, odbierzRender }: {
   dane: DanePoprawiacza; wyslij: Dispatch<AkcjaPoprawiacza>; zapisz: (model: ModelPptx, nazwa: string) => Promise<void>
@@ -39,6 +38,9 @@ export default function TrybyPrezentacji({ dane, wyslij, zapisz, historia, czyZa
   const [blad, ustawBlad] = useState('')
   const [wynikPikseli, ustawWynikPikseli] = useState<{ rewizja: number; numer: number; pdfOryginalu?: number; pdfAktualny?: number; opis: string } | null>(null)
   const [renderowanie, ustawRenderowanie] = useState(false)
+  const [czyRenderLokalny, ustawCzyRenderLokalny] = useState(false)
+  const [automatycznyRender, ustawAutomatycznyRender] = useState<{ model: ModelPptx; blad?: string }>()
+  const renderWToku = useRef<Promise<void> | null>(null)
   const [szerokoscMiniatur, ustawSzerokoscMiniatur] = useState(130)
   const [szerokoscWlasciwosci, ustawSzerokoscWlasciwosci] = useState(280)
   const korzen = useRef<HTMLElement>(null)
@@ -57,6 +59,37 @@ export default function TrybyPrezentacji({ dane, wyslij, zapisz, historia, czyZa
   const czyPelny = dane.tryb === 'PEŁNOEKRANOWY'
   const czyWiernePorownanie = Boolean(aktualnyPdf && oryginalnyPdf)
   const zajety = czyZajety || renderowanie
+  const celRenderu = !aktualnyPdf ? dane.model : czyPorownanie && !oryginalnyPdf ? dane.oryginal : null
+
+  useEffect(() => {
+    let aktualne = true
+    void czyPlatformaRenderujePptx().then((dostepna) => {
+      if (aktualne) ustawCzyRenderLokalny(dostepna)
+    }).catch((blad) => console.error('[Poprawiacz prezentacji] Odczyt platformy', blad))
+    return () => { aktualne = false }
+  }, [])
+
+  useEffect(() => {
+    if (!celRenderu || !czyRenderLokalny) return
+    let aktualne = true
+    const opoznienie = window.setTimeout(async () => {
+      await renderWToku.current
+      if (!aktualne) return
+      ustawAutomatycznyRender({ model: celRenderu })
+      const zadanie = renderujPptxDoPdf(celRenderu).then((wynik) => {
+        if (aktualne) odbierzRender({ model: celRenderu, ...wynik })
+      }).catch((przyczyna: unknown) => {
+        if (!aktualne) return
+        const blad = przyczyna instanceof Error ? przyczyna.message : 'Nie udało się wyrenderować PPTX.'
+        console.error('[Poprawiacz prezentacji] Renderowanie podglądu', blad)
+        ustawAutomatycznyRender({ model: celRenderu, blad })
+      })
+      renderWToku.current = zadanie
+      await zadanie
+      if (renderWToku.current === zadanie) renderWToku.current = null
+    }, 350)
+    return () => { aktualne = false; window.clearTimeout(opoznienie) }
+  }, [celRenderu, czyRenderLokalny, odbierzRender])
 
   useEffect(() => {
     const zasoby = pamiec
@@ -152,20 +185,30 @@ export default function TrybyPrezentacji({ dane, wyslij, zapisz, historia, czyZa
       {dane.tryb === 'ROBOCZY' && <label><input type="checkbox" checked={czyWiele} onChange={(zdarzenie) => ustawCzyWiele(zdarzenie.target.checked)} />Zaznaczanie wielu obiektów</label>}
     </div>
     {blad && <p role="alert">{blad}</p>}
-    <p role="status">{czyPorownanie ? czyWiernePorownanie ? 'Obie wersje: render PDF.' : 'Obie wersje: podgląd strukturalny — wygląd uproszczony. Wczytaj PDF obu wersji do dokładnej inspekcji.' : aktualnyPdf ? 'Wierny podgląd PDF aktualnej wersji.' : 'Podgląd strukturalny: czcionki, obrazy, efekty i wzorce nie są wiernie renderowane. PDF wymaga odświeżenia po zmianach.'} {renderowanie ? 'Przetwarzanie…' : ''}</p>
+    <p role="status">{czyPorownanie ? czyWiernePorownanie ? 'Obie wersje: render PDF.' : 'Obie wersje: podgląd strukturalny — wygląd uproszczony. Wczytaj PDF obu wersji do dokładnej inspekcji.' : aktualnyPdf ? `Podgląd PDF aktualnej wersji${aktualnyPdf.silnik ? ` (${aktualnyPdf.silnik})` : ''}.` : 'Podgląd strukturalny: uproszczony widok tekstów, obrazów, efektów i wzorców.'} {renderowanie ? 'Przetwarzanie…' : ''}</p>
+    {celRenderu && automatycznyRender?.model === celRenderu && (automatycznyRender.blad
+      ? <p role="alert">{automatycznyRender.blad} Ponów renderowanie lub wczytaj PDF w sekcji „Renderowanie podglądu”.</p>
+      : <p role="status">Renderowanie PPTX lokalnie…</p>)}
     {(czyPorownanie ? [oryginalnyPdf, aktualnyPdf] : [aktualnyPdf]).some((render) => render?.uwagi.some((uwaga) => /ręczn/i.test(uwaga))) && <p>PDF wczytano ręcznie: zgodność treści z PPTX nie jest potwierdzona. Do porównania używaj tego samego renderera.</p>}
+    {czyPorownanie && oryginalnyPdf?.silnik && aktualnyPdf?.silnik && oryginalnyPdf.silnik !== aktualnyPdf.silnik
+      && <p>Oryginał i poprawki wyrenderowano w różnych programach. Porównanie może pokazywać różnice w sposobie renderowania.</p>}
     {czyPorownanie && <div className="poprawiacz-prezentacji__akcje">
       <label>Wariant<select aria-label="Wariant" value={wariant} onChange={(zdarzenie) => ustawWariant(zdarzenie.target.value)}><option value="obok">Obok siebie</option><option value="przezroczystosc">Nakładka: przezroczystość</option><option value="odslanianie">Nakładka: odsłanianie</option></select></label>
       {wariant !== 'obok' && <label>{wariant === 'odslanianie' ? 'Odsłonięcie oryginału' : 'Przezroczystość oryginału'}<input type="range" min="0" max="100" value={procent} onChange={(zdarzenie) => ustawProcent(Number(zdarzenie.target.value))} /></label>}
       <label><input type="checkbox" checked={oryginalWidoczny} onChange={(zdarzenie) => ustawOryginalWidoczny(zdarzenie.target.checked)} />Podświetlenia oryginału</label>
       <label><input type="checkbox" checked={aktualnyWidoczny} onChange={(zdarzenie) => ustawAktualnyWidoczny(zdarzenie.target.checked)} />Podświetlenia poprawek</label>
-      <button type="button" disabled={!czyWiernePorownanie || zajety} onClick={() => void wykonaj(async () => {
+      <button type="button" disabled={!czyWiernePorownanie || !oryginal || zajety} onClick={() => void wykonaj(async () => {
+        if (!oryginal) return
         const wyniki = await Promise.allSettled([otworzPdfPrezentacji(oryginalnyPdf!.bufor), otworzPdfPrezentacji(aktualnyPdf!.bufor)])
         const dokumenty = wyniki.flatMap((wynik) => wynik.status === 'fulfilled' ? [wynik.value] : [])
         try {
           const nieudany = wyniki.find((wynik) => wynik.status === 'rejected')
           if (nieudany?.status === 'rejected') throw nieudany.reason
-          const obrazy = await Promise.all(dokumenty.map((dokument) => renderujStronePdf(dokument, slajd.numer, 400)))
+          const slajdy = [oryginal, slajd]
+          const obrazy = await Promise.all(dokumenty.map((dokument, indeks) => {
+            const strona = slajdy[indeks]
+            return renderujStronePdf(dokument, strona.numer, 400, false, undefined, strona.szerokosc / strona.wysokosc)
+          }))
           if (obrazy[0].height !== obrazy[1].height) throw new Error('Porównanie pikseli wymaga zgodnych proporcji obu slajdów.')
           const piksele = obrazy.map((obraz) => obraz.getContext('2d')!.getImageData(0, 0, obraz.width, obraz.height).data)
           const wynik = porownajPiksele(piksele[0], piksele[1], obrazy[0].width, obrazy[0].height)
@@ -216,7 +259,7 @@ export default function TrybyPrezentacji({ dane, wyslij, zapisz, historia, czyZa
               if (zadanie === zadania.current.numer) odbierzRender({ model, bufor, uwagi: ['Ręczny PDF: potwierdź zgodność treści i użycie tego samego renderera.'] })
             })
           }} /></label>
-          {isTauri() && <button type="button" disabled={zajety} onClick={() => void wykonaj(async () => {
+          {czyRenderLokalny && <button type="button" disabled={zajety} onClick={() => void wykonaj(async () => {
             const zadanie = ++zadania.current.numer
             const wynik = await renderujPptxDoPdf(model)
             if (zadanie === zadania.current.numer) odbierzRender({ model, ...wynik })

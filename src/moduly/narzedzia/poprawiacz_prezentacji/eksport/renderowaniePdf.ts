@@ -18,25 +18,49 @@ export async function sprawdzPdfPrezentacji(bufor: ArrayBuffer, liczbaSlajdow: n
   } finally { await dokument.loadingTask.destroy() }
 }
 
-export async function renderujPptxDoPdf(model: ModelPptx) {
-  if (!isTauri()) throw new Error('Automatyczne renderowanie PPTX jest dostępne w aplikacji desktop. W przeglądarce i Androidzie wczytaj PDF zapisany z aktualnej kopii PPTX.')
+const renderyWToku = new WeakMap<ModelPptx, ReturnType<typeof uruchomRenderPptx>>()
+
+export async function czyPlatformaRenderujePptx() {
+  if (!isTauri()) return false
   const platforma = await invoke<{ system: string }>('informacje_o_platformie')
-  if (!['windows', 'linux'].includes(platforma.system)) throw new Error('Na tym urządzeniu wczytaj PDF zapisany z aktualnej kopii PPTX. Automatyczne renderowanie wymaga aplikacji desktop Windows lub Linux.')
-  let wynik: { pdf: number[]; uwagi: string[] }
-  try { wynik = await invoke('renderuj_prezentacje', { dane: Array.from(new Uint8Array(model.buforZrodlowy)) }) }
-  catch (blad) { throw new Error(typeof blad === 'string' ? blad : 'Nie udało się wyrenderować PPTX lokalnie.', { cause: blad }) }
-  const bufor = new Uint8Array(wynik.pdf).buffer
-  await sprawdzPdfPrezentacji(bufor, model.slajdy.length)
-  return { bufor, uwagi: wynik.uwagi }
+  return ['windows', 'linux'].includes(platforma.system)
 }
 
-export async function renderujStronePdf(dokument: PDFDocumentProxy, numer: number, szerokoscPikseli: number, czySzara = false, sygnal?: AbortSignal) {
+export function renderujPptxDoPdf(model: ModelPptx) {
+  const renderWToku = renderyWToku.get(model)
+  if (renderWToku) return renderWToku
+  const render = uruchomRenderPptx(model).finally(() => renderyWToku.delete(model))
+  renderyWToku.set(model, render)
+  return render
+}
+
+async function uruchomRenderPptx(model: ModelPptx) {
+  if (!isTauri()) throw new Error('Automatyczne renderowanie PPTX jest dostępne w aplikacji desktop. W przeglądarce i Androidzie wczytaj PDF zapisany z aktualnej kopii PPTX.')
+  if (!await czyPlatformaRenderujePptx()) throw new Error('Na tym urządzeniu wczytaj PDF zapisany z aktualnej kopii PPTX. Automatyczne renderowanie wymaga aplikacji desktop Windows lub Linux.')
+  let odpowiedz: ArrayBuffer | number[]
+  try { odpowiedz = await invoke('renderuj_prezentacje', model.buforZrodlowy) }
+  catch (blad) { throw new Error(typeof blad === 'string' ? blad : 'Nie udało się wyrenderować PPTX lokalnie.', { cause: blad }) }
+  const wynik = Array.isArray(odpowiedz) ? new Uint8Array(odpowiedz).buffer : odpowiedz
+  if (!(wynik instanceof ArrayBuffer) || wynik.byteLength < 4) throw new Error('Renderer zwrócił niepoprawną odpowiedź.')
+  const koniecOpisu = 4 + new DataView(wynik).getUint32(0, true)
+  if (koniecOpisu >= wynik.byteLength) throw new Error('Renderer nie zwrócił pliku PDF.')
+  const opis: { silnik: 'PowerPoint' | 'LibreOffice'; uwagi: string[] } = JSON.parse(new TextDecoder().decode(new Uint8Array(wynik, 4, koniecOpisu - 4)))
+  const bufor = wynik.slice(koniecOpisu)
+  await sprawdzPdfPrezentacji(bufor, model.slajdy.length)
+  return { bufor, ...opis }
+}
+
+export async function renderujStronePdf(dokument: PDFDocumentProxy, numer: number, szerokoscPikseli: number, czySzara = false, sygnal?: AbortSignal, proporcjaSlajdu?: number) {
   sygnal?.throwIfAborted()
   const strona = await dokument.getPage(numer)
   const oryginal = strona.getViewport({ scale: 1 })
+  if (proporcjaSlajdu && Math.abs(oryginal.width / oryginal.height / proporcjaSlajdu - 1) > .005) {
+    strona.cleanup()
+    throw new Error(`Strona ${numer} PDF ma inne proporcje niż slajd PPTX. Wczytaj PDF wyeksportowany bezpośrednio ze slajdów, bez dopasowania do papieru.`)
+  }
   const widok = strona.getViewport({ scale: szerokoscPikseli / oryginal.width })
   const plotno = document.createElement('canvas')
-  plotno.width = Math.ceil(widok.width); plotno.height = Math.ceil(widok.height)
+  plotno.width = Math.ceil(szerokoscPikseli); plotno.height = Math.ceil(widok.height)
   const kontekst = plotno.getContext('2d')
   if (!kontekst) throw new Error('Nie można utworzyć podglądu PDF.')
   const zadanie = strona.render({ canvasContext: kontekst, canvas: plotno, viewport: widok, background: '#ffffff' })

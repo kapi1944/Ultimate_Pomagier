@@ -38,8 +38,8 @@ Obowiązuje poniższy plan 23 etapów, zsynchronizowany jednorazowo w V4-05. Daw
 - `wspoldzieloneZ` wskazuje inne etapy mogące modyfikować współdzielony komponent wraz z jego odbiorcami. Wspólny plik nie przenosi własności widoku na właściciela kodu.
 - `ukonczoneEtapy` pliku odnotowuje rzeczywisty udział w commitach V4-01–06, a nie ukończenie wszystkich jego przyszłych zadań. Dla widoku oznacza ukończony lifting tego widoku.
 - `realizacjaEtapow` zawiera faktyczny status etapu i dowody historyczne (SHA/raport); V4-06 wskazuje niniejszy commit, aby uniknąć samoodwołującego się SHA. Właściciele V4-01–04 i raporty pozostają zachowani. V4-07–23 są planowane i nie zostały rozpoczęte w V4-06.
-- V4-09 obejmuje workspace bez odrębnej trasy; V4-23 audytuje wszystkie 53 widoki i wszystkie pliki/powierzchnie, bez przejmowania ich własności. Etap nie musi mieć własnego ID widoku.
-- `generator-szczegolow` to alias pełnego formularza `zamkniete_szczegoly_organizacyjne_nowe`, nie osobny ekran wejściowy. Oba należą do V4-07. Lista i kopie szczegółów należą do V4-06. Rejestry, kopie i kosze wszystkich generatorów należą do V4-08.
+- V4-09 obejmuje workspace bez odrębnej trasy; V4-23 audytuje wszystkie 48 widoków i wszystkie pliki/powierzchnie, bez przejmowania ich własności. Etap nie musi mieć własnego ID widoku.
+- `generator-szczegolow` to alias pełnego formularza `zamkniete_szczegoly_organizacyjne_nowe`, nie osobny ekran wejściowy. Oba należą do V4-07. Lista i kopie szczegółów należą do V4-06. Rejestry i kopie wszystkich generatorów należą do V4-08. Osobne kosze generatorów zostały usunięte; usunięte dokumenty obsługuje wspólny widok `dokumenty_kosz`.
 
 ## Nawigacja
 
@@ -49,11 +49,9 @@ Adres `/` oznacza istniejący fallback nawigacji, a nie nową trasę. Kilka wido
 | --- | --- | --- | --- | --- |
 | `ankiety` | V4-12 | `/dokumenty/ankiety` | tak | — |
 | `ankiety_kopie_robocze` | V4-08 | `/dokumenty/ankiety/kopie-robocze` | tak | — |
-| `ankiety_kosz` | V4-08 | `/dokumenty/ankiety/kosz` | tak | — |
 | `ankiety_wszystkie` | V4-08 | `/dokumenty/ankiety/wszystkie` | tak | — |
 | `checklisty_paczek` | V4-15 | `/dokumenty/checklisty-paczek`, `/dokumenty/checklisty-paczek/:dokumentId` | tak | — |
 | `checklisty_paczek_kopie_robocze` | V4-08 | `/dokumenty/checklisty-paczek/kopie-robocze` | tak | — |
-| `checklisty_paczek_kosz` | V4-08 | `/dokumenty/checklisty-paczek/kosz` | tak | — |
 | `checklisty_paczek_wszystkie` | V4-08 | `/dokumenty/checklisty-paczek/wszystkie` | tak | — |
 | `dokumenty` | V4-08 | `/` | tak | — |
 | `dokumenty_kopie_robocze` | V4-08 | `/dokumenty/kopie-robocze` | tak | — |
@@ -61,12 +59,10 @@ Adres `/` oznacza istniejący fallback nawigacji, a nie nową trasę. Kilka wido
 | `dokumenty_wszystkie` | V4-08 | `/dokumenty/wszystkie` | tak | — |
 | `dyplomy` | V4-13 | `/dokumenty/dyplomy` | tak | — |
 | `dyplomy_kopie_robocze` | V4-08 | `/dokumenty/dyplomy/kopie-robocze` | tak | — |
-| `dyplomy_kosz` | V4-08 | `/dokumenty/dyplomy/kosz` | tak | — |
 | `dyplomy_wszystkie` | V4-08 | `/dokumenty/dyplomy/wszystkie` | tak | — |
 | `generator-szczegolow` | V4-07 | `/` | kod / nawigacja wewnętrzna | — |
 | `karta-na-drzwi` | V4-14 | `/dokumenty/karta-na-drzwi` | tak | — |
 | `karta_na_drzwi_kopie_robocze` | V4-08 | `/dokumenty/karta-na-drzwi/kopie-robocze` | tak | — |
-| `karta_na_drzwi_kosz` | V4-08 | `/dokumenty/karta-na-drzwi/kosz` | tak | — |
 | `karta_na_drzwi_wszystkie` | V4-08 | `/dokumenty/karta-na-drzwi/wszystkie` | tak | — |
 | `kartoteki` | V4-20 | `/` | tak | — |
 | `kartoteki_klienci` | V4-20 | `/` | tak | — |
@@ -76,14 +72,13 @@ Adres `/` oznacza istniejący fallback nawigacji, a nie nową trasę. Kilka wido
 | `kartoteki_uzytkownicy` | V4-21 | `/` | tak | — |
 | `listy-obecnosci` | V4-11 | `/dokumenty/listy-obecnosci`, `/dokumenty/listy-obecnosci/:dokumentId` | tak | — |
 | `listy_obecnosci_kopie_robocze` | V4-08 | `/dokumenty/listy-obecnosci/kopie-robocze` | tak | — |
-| `listy_obecnosci_kosz` | V4-08 | `/dokumenty/listy-obecnosci/kosz` | tak | — |
 | `listy_obecnosci_wszystkie` | V4-08 | `/dokumenty/listy-obecnosci/wszystkie` | tak | — |
 | `narzedzia` | V4-17 | `/narzedzia` | tak | — |
 | `poprawiacz_prezentacji` | V4-17 | `/narzedzia/poprawiacz-prezentacji` | tak | — |
 | `profil_uzytkownika` | V4-21 | `/profil`, `/profil/:uzytkownikId` | kod / nawigacja wewnętrzna | — |
 | `programy_szkolen` | V4-10 | `/dokumenty/programy-szkolen`, `/dokumenty/programy-szkolen/:dokumentId` | tak | — |
 | `programy_szkolen_kopie_robocze` | V4-08 | `/dokumenty/programy-szkolen/kopie-robocze` | tak | — |
-| `programy_szkolen_kosz` | V4-08 | `/dokumenty/programy-szkolen/kosz` | tak | — |
+| `programy_szkolen_wszystkie` | V4-08 | `/dokumenty/programy-szkolen/wszystkie` | tak | — |
 | `pulpit` | V4-04 | `/` | tak | V4-04 |
 | `replikator_dokumentow` | V4-16 | `/` | tak | — |
 | `szkolenia-otwarte` | V4-05 | `/` | tak | V4-05 |
@@ -109,7 +104,7 @@ Właściciel pliku obejmuje wszystkie warunki renderowania, stany pusty/błąd/�
 - Kartoteki: klienci, trenerzy i lokalizacje (V4-20), szablony oraz użytkownicy/profile (V4-21). Wspólny plik WidokKartotek należy do V4-20. Formularze, edycja, szczegóły, filtrowanie i usuwanie należą do właściciela zakładki.
 - Pulpit: kafelki, zadania, paczki, formularz zakupu, formularz zadania, panel szczegółów, potwierdzenia.
 - Szczegóły organizacyjne: lista i kopie, formularz sekcyjny, grupy, uczestnicy, import maila, historia i porównanie wersji, checklista publikacji, panel problemów, przygotowania dokumentów, list obecności i dokumentów powiązanych.
-- Generatory: konfiguracja, edycja, wybór organizatora/szablonu, podgląd A4, walidacja, kopie, listy wszystkich dokumentów i kosze; Programy dodatkowo staging importu TXT/DOCX/PDF i edytor WYSIWYG; Dyplomy dodatkowo warianty i generowanie seryjne; wspólny układ, status zapisu, panel jakości i akcje eksportu w V4-09; rejestry, kopie i kosze w V4-08. Papier i eksport nie podlegają zmianie wyglądu.
+- Generatory: konfiguracja, edycja, wybór organizatora/szablonu, podgląd A4, walidacja, kopie i listy wszystkich dokumentów; Programy dodatkowo staging importu TXT/DOCX/PDF i edytor WYSIWYG; Dyplomy dodatkowo warianty i generowanie seryjne; wspólny układ, status zapisu, panel jakości i akcje eksportu w V4-09; rejestry i kopie w V4-08. Papier i eksport nie podlegają zmianie wyglądu.
 - Replikator: oryginał i wynik, mapowanie/analiza, podglądy; Narzędzia: start oraz poprawiacz prezentacji, panel analizy i podgląd struktury.
 - Zakupy: pulpit, zapotrzebowania, katalog, listy, zamówienia/dostawy, historia; Magazyn: stany, ruchy i inwentaryzacje, mapa 2D i edytor lokalizacji.
 - Powłoka: logowanie przed sesją, menu drzewo/lista, nagłówek, profil, potwierdzenie opuszczenia niezapisanych zmian, granice błędów. Wspólne pola telefonu, odznaki i akcje rekordu są zinwentaryzowane również bez własnej trasy.
@@ -172,7 +167,7 @@ Właściciel pliku obejmuje wszystkie warunki renderowania, stany pusty/błąd/�
 | `src/moduly/dokumenty/wspolne/WyborZapisanegoUkladu.tsx` | V4-09 | V4-10, V4-11, V4-12, V4-13, V4-14, V4-15 | — | 0 |
 | `src/moduly/narzedzia/WidokNarzedzi.tsx` | V4-17 | — | — | 0 |
 | `src/moduly/narzedzia/poprawiacz_prezentacji/PanelPrzygotowania.tsx` | V4-17 | — | — | 1 |
-| `src/moduly/narzedzia/poprawiacz_prezentacji/eksport/PanelEksportu.tsx` | V4-17 | — | — | 1 |
+| `src/moduly/narzedzia/poprawiacz_prezentacji/eksport/PanelEksportu.tsx` | V4-17 | — | — | 2 |
 | `src/moduly/narzedzia/poprawiacz_prezentacji/eksport/PodgladWydruku.tsx` | V4-17 | — | — | 0 |
 | `src/moduly/narzedzia/poprawiacz_prezentacji/PodgladStrukturalny.tsx` | V4-17 | — | — | 0 |
 | `src/moduly/narzedzia/poprawiacz_prezentacji/WidokPoprawiaczaPrezentacji.tsx` | V4-17 | — | — | 1 |
@@ -184,6 +179,7 @@ Właściciel pliku obejmuje wszystkie warunki renderowania, stany pusty/błąd/�
 | `src/moduly/zakupy/magazyn/KreatorLokalizacji.tsx` | V4-19 | — | — | 1 |
 | `src/moduly/zakupy/magazyn/SelektorLokalizacji.tsx` | V4-19 | — | — | 0 |
 | `src/moduly/zakupy/magazyn/EdytorLokalizacji.tsx` | V4-19 | — | — | 1 |
+| `src/moduly/zakupy/magazyn/ElewacjaMagazynu.tsx` | V4-19 | — | — | 0 |
 | `src/moduly/zakupy/magazyn/PlanMagazynu.tsx` | V4-19 | — | — | 0 |
 | `src/moduly/zakupy/magazyn/WidokMapyMagazynu.tsx` | V4-19 | — | — | 3 |
 | `src/moduly/zakupy/magazyn/WidokStanowMagazynowych.tsx` | V4-19 | — | — | 1 |
@@ -196,6 +192,7 @@ Właściciel pliku obejmuje wszystkie warunki renderowania, stany pusty/błąd/�
 | `src/moduly/zamkniete/pulpit/WidokPulpitu.tsx` | V4-04 | — | V4-04 | 16 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/KartaGrupySzkoleniowej.tsx` | V4-07 | — | — | 1 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/KontekstBledowPol.tsx` | V4-07 | — | — | 0 |
+| `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/MiniaturaDokumentu.tsx` | V4-07 | — | — | 0 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/PanelDokumentowPowiazanych.tsx` | V4-07 | V4-08, V4-10, V4-11, V4-12, V4-13, V4-14, V4-15 | — | 1 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/PanelPrzygotowaniaDokumentow.tsx` | V4-07 | V4-08, V4-10, V4-11, V4-12, V4-13, V4-14, V4-15 | — | 0 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/PanelTworzeniaListObecnosci.tsx` | V4-07 | V4-08, V4-11 | — | 0 |

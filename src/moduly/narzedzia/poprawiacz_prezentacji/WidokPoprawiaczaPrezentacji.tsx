@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from 'react'
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
 import IkonaMenu from '../../../aplikacja/menu/IkonaMenu'
 import { poczatkowyStanPoprawiacza, zmienStanPoprawiacza } from './modele/stanPoprawiacza'
 import type { OperacjaPrezentacji } from './modele/modelPrezentacji'
@@ -80,11 +80,12 @@ export default function WidokPoprawiaczaPrezentacji() {
     finally { operacjaWToku.current = false; ustawCzyPrzygotowanie(false) }
   }
 
-  function odbierzRender(render: RenderPodgladu) {
+  const odbierzRender = useCallback((render: RenderPodgladu) => {
     if (render.model !== biezaceModele.current.model && render.model !== biezaceModele.current.oryginal) return
-    ustawRendery((obecne) => [...obecne.filter((stary) => (stary.model === dane.oryginal || stary.model === dane.model) && stary.model !== render.model), { ...render, klucz: ++numerRenderu.current }])
+    const klucz = ++numerRenderu.current
+    ustawRendery((obecne) => [...obecne.filter((stary) => (stary.model === dane.oryginal || stary.model === dane.model) && stary.model !== render.model), { ...render, klucz }])
     if (render.model === dane.model) wyslijAkcje({ typ: 'RENDER', rewizja: dane.rewizja })
-  }
+  }, [dane.model, dane.oryginal, dane.rewizja])
 
   async function analizuj() {
     if (!dane.prezentacja || operacjaWToku.current) return
@@ -170,7 +171,8 @@ export default function WidokPoprawiaczaPrezentacji() {
             <p className="narzedzia__opis">Dalsze przygotowanie materiałów jest dostępne w panelu Eksport i druk.</p>
           </section>}
           <PanelPrzygotowania key={dane.model ? dane.prezentacja?.nazwa : 'okladka'} model={dane.model} czyZajety={czyZajety} ustawZajety={ustawCzyPrzygotowanie}
-            daneOkladki={daneOkladki} ustawDaneOkladki={ustawDaneOkladki} zmienModel={(model) => zapiszOperacje(model, 'Przygotowanie SEMPER')} />
+            nazwaPliku={dane.prezentacja?.nazwa ?? 'Prezentacja.pptx'} daneOkladki={daneOkladki} ustawDaneOkladki={ustawDaneOkladki}
+            zmienModel={(model, operacja) => zapiszOperacje(model, operacja ?? 'Przygotowanie SEMPER')} />
         </div>
         {!dane.model && <div className="narzedzia__panel"><p>Podgląd pojawi się po przeanalizowaniu prezentacji.</p></div>}
 

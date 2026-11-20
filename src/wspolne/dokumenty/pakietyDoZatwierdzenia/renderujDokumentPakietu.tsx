@@ -11,7 +11,7 @@ function obiekt(wartosc: unknown): Record<string, unknown> {
   return wartosc as Record<string, unknown>
 }
 
-async function przygotujRenderer(dokument: Dokument<unknown, unknown>, konfiguracja: KonfiguracjaPakietu): Promise<{ zawartosc: ReactNode; ustawienia: Partial<UstawieniaEksportuPdf>; sprawdz?: (obszar: HTMLElement) => string | null }> {
+export async function przygotujRenderer(dokument: Dokument<unknown, unknown>, konfiguracja: KonfiguracjaPakietu): Promise<{ zawartosc: ReactNode; ustawienia: Partial<UstawieniaEksportuPdf>; sprawdz?: (obszar: HTMLElement) => string | null }> {
   const dane = obiekt(dokument.daneDokumentu)
   const zasoby = pobierzMapeZasobowObrazowDokumentu()
   switch (dokument.typ) {

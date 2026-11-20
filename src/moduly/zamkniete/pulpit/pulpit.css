@@ -161,6 +161,17 @@
 .pulpit .pulpit-rutyna__kontrolki button:hover { background: transparent; border-color: var(--pulpit-kolor-bloku, var(--ui-obramowanie)); }
 .pulpit-rutyna__kontrolki button span { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .pulpit .pulpit-rutyna__kontrolki input[type="checkbox"] { flex: none; width: 24px; height: 24px; margin: 0; padding: 0; }
+.pulpit .pulpit-rutyna__kontrolki input[type="checkbox"]:checked {
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 50%;
+  border: 0;
+  background-color: #2fb35a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E");
+  background-size: 80% 80%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
 .pulpit-rutyna__kontrolki--wykonane { --pulpit-nasycenie-rutyny: 22%; }
 .pulpit-rutyna__kontrolki--wykonane button span { text-decoration: line-through; }
 .pulpit-rutyny-blokowe { display: grid; grid-template-columns: minmax(0, 1fr); margin-block: 8px; }

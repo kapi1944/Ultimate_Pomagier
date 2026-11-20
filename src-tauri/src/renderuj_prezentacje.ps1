@@ -11,14 +11,18 @@ try {
     foreach ($slajd in $prezentacja.Slides) {
         $slajd.SlideShowTransition.Hidden = 0
         if ($CzyZrzuty) { $slajd.Export((Join-Path $Katalog ("slajd-" + $slajd.SlideIndex + ".png")), 'PNG', 1400, [int](1400 * $prezentacja.PageSetup.SlideHeight / $prezentacja.PageSetup.SlideWidth)) }
-        foreach ($obiekt in $slajd.Shapes) {
-            if ($obiekt.HasTextFrame -eq -1 -and $obiekt.TextFrame2.HasText -eq -1) {
-                $wysokoscTekstu = $obiekt.TextFrame2.TextRange.BoundHeight
-                $dostepnaWysokosc = $obiekt.Height - $obiekt.TextFrame2.MarginTop - $obiekt.TextFrame2.MarginBottom
-                if ($wysokoscTekstu -gt $dostepnaWysokosc + 2) {
-                    $uwagi.Add("Slajd $($slajd.SlideIndex): tekst w obiekcie '$($obiekt.Name)' moze wychodzic poza pole.")
+        try {
+            foreach ($obiekt in $slajd.Shapes) {
+                if ($obiekt.HasTextFrame -eq -1 -and $obiekt.TextFrame2.HasText -eq -1) {
+                    $wysokoscTekstu = $obiekt.TextFrame2.TextRange.BoundHeight
+                    $dostepnaWysokosc = $obiekt.Height - $obiekt.TextFrame2.MarginTop - $obiekt.TextFrame2.MarginBottom
+                    if ($wysokoscTekstu -gt $dostepnaWysokosc + 2) {
+                        $uwagi.Add("Slajd $($slajd.SlideIndex): tekst w obiekcie '$($obiekt.Name)' moze wychodzic poza pole.")
+                    }
                 }
             }
+        } catch {
+            $uwagi.Add("Slajd $($slajd.SlideIndex): PowerPoint nie mogl sprawdzic wysokosci tekstu.")
         }
     }
     # Ukryte slajdy ujawniamy tylko w pamieci kopii otwartej do odczytu.

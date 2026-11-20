@@ -13,6 +13,7 @@ import {
   type WynikUtworzeniaDokumentu,
 } from '../../../../wspolne/integracje/szczegolyDoDokumentow'
 import type { WersjaRoboczaGeneratora } from '../typy'
+import MiniaturaDokumentu from './MiniaturaDokumentu'
 
 const PanelPakietu = lazy(() => import('../../../../wspolne/dokumenty/pakietyDoZatwierdzenia/PanelPakietu'))
 
@@ -23,6 +24,10 @@ type WlasciwosciPaneluPrzygotowaniaDokumentow = {
   wersjaPakietu?: WersjaRoboczaGeneratora | null
   otworzDokument: (dokument: Dokument<unknown, unknown>) => void
   poUtworzeniu: () => void
+}
+
+function klasaKarty(rodzaj: RodzajDokumentuZeSzczegolow) {
+  return `szczegoly-dokument-karta${rodzajePakietuPodstawowego.includes(rodzaj) ? ' szczegoly-dokument-karta--podstawowy' : ''}`
 }
 
 function etykietaStanu(stan: ReturnType<typeof pobierzStanDokumentuZeSzczegolow>['stan']) {
@@ -94,15 +99,20 @@ export default function PanelPrzygotowaniaDokumentow({ wersja, wersjaPakietu = w
 
       <div className="szczegoly-dokumenty-blok">
         <h3>Pojedyncze dokumenty</h3>
+        <p className="szczegoly-dokumenty-legenda">
+          <span className="szczegoly-dokumenty-legenda__znacznik szczegoly-dokumenty-legenda__znacznik--podstawowy" aria-hidden="true" /> Pakiet podstawowy
+          <span className="szczegoly-dokumenty-legenda__znacznik" aria-hidden="true" /> Dokumenty dodatkowe
+        </p>
         <div className="szczegoly-dokumenty-siatka">
           {wszystkieRodzaje.flatMap((rodzaj) => {
             const grupy = pobierzGrupyDlaRodzaju(rodzaj)
             if (!grupy.length) {
               return [(
-                <article className="szczegoly-dokument-karta" key={`${rodzaj}-brak-grupy`}>
+                <article className={klasaKarty(rodzaj)} key={`${rodzaj}-brak-grupy`}>
                   <strong>{etykietyDokumentowZeSzczegolow[rodzaj]}</strong>
                   <span>Status: Brak</span>
                   <span>Brak grupy</span>
+                  <MiniaturaDokumentu dokument={null} etykieta={etykietyDokumentowZeSzczegolow[rodzaj]} />
                 </article>
               )]
             }
@@ -111,7 +121,8 @@ export default function PanelPrzygotowaniaDokumentow({ wersja, wersjaPakietu = w
               const grupaId = grupa?.id ?? null
               const stan = wersja ? pobierzStanDokumentuZeSzczegolow(wersja, rodzaj, grupaId) : { stan: 'brak' as const, dokument: null }
               return (
-                <article className="szczegoly-dokument-karta" key={`${rodzaj}-${grupaId ?? 'zbiorczy'}`}>
+                <article className={klasaKarty(rodzaj)} key={`${rodzaj}-${grupaId ?? 'zbiorczy'}`}>
+                  <MiniaturaDokumentu dokument={stan.dokument} etykieta={`${etykietyDokumentowZeSzczegolow[rodzaj]}${grupa ? ` — ${grupa.nazwa}` : ''}`} />
                   <strong>{etykietyDokumentowZeSzczegolow[rodzaj]}</strong>
                   {grupa && <span>Grupa: {grupa.nazwa}</span>}
                   <span>Status: {etykietaStanu(stan.stan)}</span>

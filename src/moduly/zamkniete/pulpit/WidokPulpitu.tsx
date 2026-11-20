@@ -1061,9 +1061,8 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
       </div>
       {zadaniaGodzinowe.length > 0 && <details className="pulpit-terminy"><summary>Zadania z terminem ({zadaniaGodzinowe.length})</summary><ul>{zadaniaGodzinowe.map((zadanie) => <li key={zadanie.id}><Przycisk onClick={() => otworzZadanie(zadanie)}>{etykietaTerminuZadania(zadanie)} — {zadanie.tytul}</Przycisk></li>)}</ul></details>}
       {zadaniaWykonane.length > 0 && <details className="pulpit-wykonane"><summary>Wykonane ({zadaniaWykonane.length})</summary>{zadaniaWykonane.map((zadanie) => <KartaZadania key={zadanie.id} nazwaSzkolenia={pobierzNazweSzkolenia(szkoleniaDostepne, zadanie.powiazaneSzkolenieId)} zadanie={zadanie} teraz={teraz} zakresDniaPracy={zakresDniaPracy} uzytkownicy={uzytkownicy} aktualnyUzytkownikId={zalogowanyUzytkownik?.id} otworz={() => otworzZadanie(zadanie)} />)}</details>}
+      <WidokRutyn daneRutyn={daneRutyn} otworzMonitor={() => { ustawFiltr('PACZKI'); window.setTimeout(() => document.querySelector('.monitor-wysylek')?.scrollIntoView({ block: 'start' }), 0) }} />
     </section>}
-
-    <WidokRutyn daneRutyn={daneRutyn} otworzMonitor={() => { ustawFiltr('PACZKI'); window.setTimeout(() => document.querySelector('.monitor-wysylek')?.scrollIntoView({ block: 'start' }), 0) }} />
 
     <section aria-label="Podsumowanie" className="pulpit-kafelki">
       {widoczneKafelki.doZrobienia && (

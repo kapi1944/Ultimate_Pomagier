@@ -19,6 +19,7 @@ export default function PanelEksportu({ model, nazwa, daneOkladki, czyZajety, us
   const [okladki, ustawOkladki] = useState<Partial<Record<OrientacjaOkladki, RenderOkladki>>>({})
   const [zrodloOkladki, ustawZrodloOkladki] = useState<'szablon' | 'pierwszySlajd'>('szablon')
   const [blad, ustawBlad] = useState('')
+  const [bledyEksportu, ustawBledyEksportu] = useState<string[]>([])
   const [postep, ustawPostep] = useState('')
   const blokada = useRef(false)
   const bufor = render?.model === model ? render.bufor : null
@@ -39,7 +40,12 @@ export default function PanelEksportu({ model, nazwa, daneOkladki, czyZajety, us
     if (czyZajety || blokada.current) return
     blokada.current = true; ustawZajety(true); ustawBlad(''); ustawPostep('Przygotowywanie materiałów…')
     try { await operacja(); ustawPostep('Zakończono przygotowanie materiałów.') }
-    catch (bladEksportu) { ustawBlad(bladEksportu instanceof Error ? bladEksportu.message : 'Nie udało się wyeksportować materiałów.'); ustawPostep('') }
+    catch (bladEksportu) {
+      const opis = bladEksportu instanceof Error ? bladEksportu.message : 'Nie udało się przygotować materiałów.'
+      console.error('[Poprawiacz prezentacji] Eksport i druk', opis)
+      ustawBlad(opis); ustawPostep('')
+      ustawBledyEksportu((obecne) => [...obecne.slice(-9), opis])
+    }
     finally { blokada.current = false; ustawZajety(false) }
   }
 
@@ -62,14 +68,42 @@ export default function PanelEksportu({ model, nazwa, daneOkladki, czyZajety, us
     return wynik.bufor
   }
 
-  async function plikiOkladki(orientacja: OrientacjaOkladki): Promise<PlikMaterialow[]> {
-    const czyPierwszySlajd = zrodloOkladki === 'pierwszySlajd' && model !== null
-    const pdf = czyPierwszySlajd ? await zapewnijPdf() : await zapewnijOkladke(orientacja)
-    const ustawieniaOkladki: UstawieniaDruku = { ...domyslneUstawieniaDruku(), profil: 'reczny', orientacja, dwustronnie: false, zakres: '1' }
-    const pliki = await wygenerujPdfDruku(pdf, przygotujPlanDruku(czyPierwszySlajd ? model.slajdy.length : 1, ustawieniaOkladki), ustawPostep)
-    const plikPdf = pliki[0].plik
-    const obraz = await plikPdf.arrayBuffer()
-    return [{ nazwa: `okladka_${orientacja}.pdf`, plik: plikPdf }, { nazwa: `okladka_${orientacja}.png`, plik: await wygenerujPngOkladki(obraz) }]
+  async function generujOkladke<T>(orientacja: OrientacjaOkladki, format: string, generuj: () => Promise<T>) {
+    try { return await generuj() }
+    catch (blad) {
+      throw new Error(`Generowanie okładki (${orientacja}, ${format}). ${blad instanceof Error ? blad.message : 'Nieznany błąd.'}`, { cause: blad })
+    }
+  }
+
+  async function pdfOkladki(orientacja: OrientacjaOkladki): Promise<PlikMaterialow> {
+    return generujOkladke(orientacja, 'PDF A4', async () => {
+      const prezentacja = zrodloOkladki === 'pierwszySlajd' ? model : null
+      const pdf = prezentacja ? await zapewnijPdf() : await zapewnijOkladke(orientacja)
+      const ustawieniaOkladki: UstawieniaDruku = { ...domyslneUstawieniaDruku(), profil: 'reczny', orientacja, dwustronnie: false, zakres: '1' }
+      const [plik] = await wygenerujPdfDruku(pdf, przygotujPlanDruku(prezentacja?.slajdy.length ?? 1, ustawieniaOkladki), ustawPostep)
+      return { nazwa: `okladka_${orientacja}.pdf`, plik: plik.plik }
+    })
+  }
+
+  async function pngOkladki(orientacja: OrientacjaOkladki, pdf: PlikMaterialow): Promise<PlikMaterialow> {
+    return generujOkladke(orientacja, 'PNG', async () => ({
+      nazwa: `okladka_${orientacja}.png`,
+      plik: await wygenerujPngOkladki(await pdf.plik.arrayBuffer(), orientacja === 'pozioma' ? 3508 : 2480),
+    }))
+  }
+
+  async function plikiOkladki(orientacja: OrientacjaOkladki) {
+    const pdf = await pdfOkladki(orientacja)
+    return [pdf, await pngOkladki(orientacja, pdf)]
+  }
+
+  async function pobierzPptxOkladki(orientacja: OrientacjaOkladki) {
+    const okladka = await generujOkladke(orientacja, 'PPTX', () => przygotujOkladkeSemper(orientacja, daneOkladki))
+    const nazwa = `okladka_${orientacja}.pptx`
+    let plik: Blob
+    try { plik = await zapiszPptx(okladka) }
+    catch (blad) { throw new Error(`Nie udało się zapisać pliku „${nazwa}”.`, { cause: blad }) }
+    pobierzPlikMaterialow(plik, nazwa)
   }
 
   async function pobierzDruk() {
@@ -112,17 +146,18 @@ export default function PanelEksportu({ model, nazwa, daneOkladki, czyZajety, us
         const plik = zdarzenie.target.files?.[0]; zdarzenie.target.value = ''
         if (plik) void wykonaj(async () => { const dane = await plik.arrayBuffer(); await sprawdzPdfPrezentacji(dane, model.slajdy.length); odbierzRender({ model, bufor: dane, uwagi: ['PDF wczytano ręcznie. Sprawdź zgodność jego treści i kolejności z aktualnym PPTX.'] }) })
       }} /></label>
-      <p className="narzedzia__opis">Windows desktop: renderowanie lokalnym PowerPoint. Linux desktop: lokalny LibreOffice. Przeglądarka i Android: wczytaj PDF wyeksportowany ze wszystkich slajdów aktualnego PPTX. Każda zmiana PPTX unieważnia wcześniejszy podgląd.</p>
+      <p className="narzedzia__opis">Windows desktop: lokalny PowerPoint lub LibreOffice. Linux desktop: lokalny LibreOffice. W przeglądarce i na Androidzie wczytaj PDF wyeksportowany ze wszystkich slajdów aktualnego PPTX.</p>
       {render?.model === model && render.uwagi.length > 0 && <details open><summary>Uwagi z renderowania ({render.uwagi.length})</summary><ul className="poprawiacz-prezentacji__lista">{render.uwagi.map((uwaga, indeks) => <li key={indeks}>{uwaga}</li>)}</ul></details>}
     </section>}
     <section className="narzedzia__panel" aria-label="Generator okładek SEMPER">
       <h2>Okładki SEMPER — osobne kompozycje z wzorców</h2>
       <p>Okładki korzystają z danych szkolenia powyżej oraz oryginalnych grafik, logo i kodów QR. Pion i poziom mają osobne szablony.</p>
       {model && <label>Źródło okładki<select disabled={czyZajety} value={zrodloOkladki} onChange={(zdarzenie) => ustawZrodloOkladki(zdarzenie.target.value as typeof zrodloOkladki)}><option value="szablon">Szablony SEMPER — osobna kompozycja pionowa i pozioma</option><option value="pierwszySlajd">Pierwszy slajd — cała treść, proporcjonalne dopasowanie do A4</option></select></label>}
+      {zrodloOkladki === 'pierwszySlajd' && <p>Edytowalny PPTX jest dostępny dla okładek z szablonów SEMPER.</p>}
       {(['pionowa', 'pozioma'] as const).map((orientacja) => <fieldset key={orientacja} disabled={czyZajety} className="poprawiacz-prezentacji__pola"><legend>Okładka {orientacja}</legend>
-        <div className="poprawiacz-prezentacji__akcje"><button type="button" onClick={() => void wykonaj(async () => { const pliki = await plikiOkladki(orientacja); pobierzPlikMaterialow(pliki[0].plik, pliki[0].nazwa) })}>Pobierz okładkę {orientacja === 'pionowa' ? 'pionową' : 'poziomą'} — PDF A4</button>
-          <button type="button" onClick={() => void wykonaj(async () => { const pliki = await plikiOkladki(orientacja); pobierzPlikMaterialow(pliki[1].plik, pliki[1].nazwa) })}>Pobierz PNG — {orientacja}</button>
-          <button type="button" onClick={() => void wykonaj(async () => pobierzPlikMaterialow(await zapiszPptx(await przygotujOkladkeSemper(orientacja, daneOkladki)), `okladka_${orientacja}.pptx`))}>Pobierz edytowalną okładkę PPTX</button></div>
+        <div className="poprawiacz-prezentacji__akcje"><button type="button" onClick={() => void wykonaj(async () => { const pdf = await pdfOkladki(orientacja); pobierzPlikMaterialow(pdf.plik, pdf.nazwa) })}>Pobierz okładkę {orientacja === 'pionowa' ? 'pionową' : 'poziomą'} — PDF A4</button>
+          <button type="button" onClick={() => void wykonaj(async () => { const png = await pngOkladki(orientacja, await pdfOkladki(orientacja)); pobierzPlikMaterialow(png.plik, png.nazwa) })}>Pobierz PNG — {orientacja}</button>
+          {zrodloOkladki === 'szablon' && <button type="button" onClick={() => void wykonaj(() => pobierzPptxOkladki(orientacja))}>Pobierz edytowalną okładkę PPTX</button>}</div>
         <label>Wczytaj PDF tej okładki po eksporcie z PowerPoint<input type="file" accept=".pdf" onChange={(zdarzenie) => {
           const plik = zdarzenie.target.files?.[0]; zdarzenie.target.value = ''
           if (plik) void wykonaj(async () => {
@@ -136,6 +171,9 @@ export default function PanelEksportu({ model, nazwa, daneOkladki, czyZajety, us
       </fieldset>)}
     </section>
     {blad && <p role="alert">{blad}</p>}{postep && <p role="status">{postep}</p>}
+    {bledyEksportu.length > 0 && <details><summary>Diagnostyka eksportu ({bledyEksportu.length})</summary>
+      <ul>{bledyEksportu.map((opis, indeks) => <li key={indeks}>{opis}</li>)}</ul>
+    </details>}
     {bufor && plan.length > 0 && <PodgladWydruku bufor={bufor} plan={plan} />}
   </>
 }

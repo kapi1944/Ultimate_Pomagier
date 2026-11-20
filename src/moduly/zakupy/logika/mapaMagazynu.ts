@@ -1,4 +1,4 @@
-import type { LokalizacjaMapy, LokalizacjaMagazynowa, ProstokatMapy, StanZakupow, TypLokalizacjiMagazynowej } from '../modele/zakupy'
+import type { LokalizacjaMapy, LokalizacjaMagazynowa, ProstokatMapy, StanZakupow, TypLokalizacjiMagazynowej, WygladMebla } from '../modele/zakupy'
 import { obliczMiarkeStanu, wyliczStanyMagazynowe } from './stanyMagazynowe'
 
 export const typyLokalizacji: { typ: TypLokalizacjiMagazynowej; etykieta: string }[] = [
@@ -70,6 +70,12 @@ export function normalizujLokalizacjeMapy(wartosci: unknown, wersja: 1 | 2 = 1):
       const prostokat = dane.polozenieNaMapie as Partial<ProstokatMapy> | null
       if (!prostokat || !['x', 'y', 'szerokosc', 'wysokosc'].every((klucz) => typeof (prostokat as Record<string, unknown>)[klucz] === 'number')) throw new Error('Nieprawidłowa geometria mapy.')
     }
+    const czySekcja = (wartosc: unknown) => typeof wartosc === 'number' && Number.isInteger(wartosc) && wartosc >= 1 && wartosc <= 6
+    if (dane.wyglad !== undefined) {
+      const wyglad = dane.wyglad as Partial<WygladMebla> | null
+      if (!wyglad || (wyglad.rodzaj !== 'REGAL' && wyglad.rodzaj !== 'SZAFA') || !czySekcja(wyglad.sekcje)) throw new Error('Nieprawidłowy wygląd mebla.')
+    }
+    if (dane.sekcja !== undefined && !czySekcja(dane.sekcja)) throw new Error('Numer sekcji musi być liczbą całkowitą od 1 do 6.')
     return dane as LokalizacjaMagazynowa
   })
   if (wersja === 1) {
