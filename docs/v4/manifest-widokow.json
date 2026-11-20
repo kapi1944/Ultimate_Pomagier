@@ -1135,6 +1135,12 @@
       "ukonczoneEtapy": [],
       "wspoldzieloneZ": []
     },
+    "src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/MiniaturaDokumentu.tsx": {
+      "zadanie": "V4-07",
+      "powierzchnie": [],
+      "ukonczoneEtapy": [],
+      "wspoldzieloneZ": []
+    },
     "src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/PanelDokumentowPowiazanych.tsx": {
       "zadanie": "V4-07",
       "powierzchnie": [

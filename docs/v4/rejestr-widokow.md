@@ -192,6 +192,7 @@ Właściciel pliku obejmuje wszystkie warunki renderowania, stany pusty/błąd/�
 | `src/moduly/zamkniete/pulpit/WidokPulpitu.tsx` | V4-04 | — | V4-04 | 16 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/KartaGrupySzkoleniowej.tsx` | V4-07 | — | — | 1 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/KontekstBledowPol.tsx` | V4-07 | — | — | 0 |
+| `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/MiniaturaDokumentu.tsx` | V4-07 | — | — | 0 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/PanelDokumentowPowiazanych.tsx` | V4-07 | V4-08, V4-10, V4-11, V4-12, V4-13, V4-14, V4-15 | — | 1 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/PanelPrzygotowaniaDokumentow.tsx` | V4-07 | V4-08, V4-10, V4-11, V4-12, V4-13, V4-14, V4-15 | — | 0 |
 | `src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/PanelTworzeniaListObecnosci.tsx` | V4-07 | V4-08, V4-11 | — | 0 |
