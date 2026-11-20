@@ -43,14 +43,6 @@
       "wMenu": true,
       "ukonczoneEtapy": []
     },
-    "ankiety_kosz": {
-      "zadanie": "V4-08",
-      "sciezki": [
-        "/dokumenty/ankiety/kosz"
-      ],
-      "wMenu": true,
-      "ukonczoneEtapy": []
-    },
     "ankiety_wszystkie": {
       "zadanie": "V4-08",
       "sciezki": [
@@ -72,14 +64,6 @@
       "zadanie": "V4-08",
       "sciezki": [
         "/dokumenty/checklisty-paczek/kopie-robocze"
-      ],
-      "wMenu": true,
-      "ukonczoneEtapy": []
-    },
-    "checklisty_paczek_kosz": {
-      "zadanie": "V4-08",
-      "sciezki": [
-        "/dokumenty/checklisty-paczek/kosz"
       ],
       "wMenu": true,
       "ukonczoneEtapy": []
@@ -140,14 +124,6 @@
       "wMenu": true,
       "ukonczoneEtapy": []
     },
-    "dyplomy_kosz": {
-      "zadanie": "V4-08",
-      "sciezki": [
-        "/dokumenty/dyplomy/kosz"
-      ],
-      "wMenu": true,
-      "ukonczoneEtapy": []
-    },
     "dyplomy_wszystkie": {
       "zadanie": "V4-08",
       "sciezki": [
@@ -177,14 +153,6 @@
       "zadanie": "V4-08",
       "sciezki": [
         "/dokumenty/karta-na-drzwi/kopie-robocze"
-      ],
-      "wMenu": true,
-      "ukonczoneEtapy": []
-    },
-    "karta_na_drzwi_kosz": {
-      "zadanie": "V4-08",
-      "sciezki": [
-        "/dokumenty/karta-na-drzwi/kosz"
       ],
       "wMenu": true,
       "ukonczoneEtapy": []
@@ -262,14 +230,6 @@
       "wMenu": true,
       "ukonczoneEtapy": []
     },
-    "listy_obecnosci_kosz": {
-      "zadanie": "V4-08",
-      "sciezki": [
-        "/dokumenty/listy-obecnosci/kosz"
-      ],
-      "wMenu": true,
-      "ukonczoneEtapy": []
-    },
     "listy_obecnosci_wszystkie": {
       "zadanie": "V4-08",
       "sciezki": [
@@ -320,10 +280,10 @@
       "wMenu": true,
       "ukonczoneEtapy": []
     },
-    "programy_szkolen_kosz": {
+    "programy_szkolen_wszystkie": {
       "zadanie": "V4-08",
       "sciezki": [
-        "/dokumenty/programy-szkolen/kosz"
+        "/dokumenty/programy-szkolen/wszystkie"
       ],
       "wMenu": true,
       "ukonczoneEtapy": []

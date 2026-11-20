@@ -35,8 +35,8 @@ export const etykietyDokumentowZeSzczegolow: Record<RodzajDokumentuZeSzczegolow,
   checklista: 'Checklista paczek',
 }
 
-export const rodzajePakietuPodstawowego: RodzajDokumentuZeSzczegolow[] = ['program', 'lista', 'ankieta', 'dyplomy']
-export const rodzajeDokumentowDodatkowych: RodzajDokumentuZeSzczegolow[] = ['karty', 'checklista']
+export const rodzajePakietuPodstawowego: RodzajDokumentuZeSzczegolow[] = ['program', 'lista', 'ankieta', 'dyplomy', 'checklista']
+export const rodzajeDokumentowDodatkowych: RodzajDokumentuZeSzczegolow[] = ['karty']
 export const rodzajeWszystkichDokumentow: RodzajDokumentuZeSzczegolow[] = [...rodzajePakietuPodstawowego, ...rodzajeDokumentowDodatkowych]
 
 const typyRodzajow: Record<RodzajDokumentuZeSzczegolow, TypDokumentu[]> = {

@@ -13,6 +13,10 @@ export default defineConfig(({ mode: trybVite, command: polecenie, isPreview: cz
   if (polecenie === 'build' && trybVite === 'demonstracyjny') throw new Error('Demonstracja jest dostępna wyłącznie w serwerze deweloperskim: npm run dev:demo.')
   const trybFrontendu = okreslTrybFrontendu(trybVite, loadEnv(trybVite, process.cwd(), 'VITE_'))
   return {
+    // Jedna kopia Reacta w trybie deweloperskim: Tiptap (leniwy generator programów) bywa odkrywany dopiero w trakcie pracy,
+    // co przebudowuje cache zależności i tworzy drugą kopię Reacta ("Invalid hook call").
+    resolve: { dedupe: ['react', 'react-dom'] },
+    optimizeDeps: { include: ['react', 'react-dom', 'react-dom/client', 'react/jsx-dev-runtime', '@tiptap/react', '@tiptap/starter-kit', '@tiptap/extension-placeholder', '@tiptap/extension-underline'] },
     server: { watch: { ignored: ['**/src-tauri/target/**', '**/src-tauri/konta/target/**', '**/src-tauri/gen/**', '**/.desktop-tools/**', '**/.desktop-icons/**', '**/wydanie-desktop/**', '**/wydanie-android/**', '**/wydanie-web/**', '**/wydanie-publikacja/**'] } },
     define: {
       __INFORMACJE_O_WERSJI__: JSON.stringify(informacjeOWersji),

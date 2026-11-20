@@ -67,13 +67,14 @@ test('generator Checklist pobiera także kopię roboczą Szczegółów z kanonic
   assert.equal(szczegoly[0]?.zrodloKontekstu.szczegolyOrganizacyjneId, 'wersja-szczegolow-1')
 })
 
-test('pięć modułów ma spójne trasy i pozycje Wszystkie', () => {
+test('sześć modułów ma spójne trasy i pozycje Wszystkie', () => {
   const oczekiwane = [
     ['generator-list-obecnosci', 'Wszystkie listy obecności', '/dokumenty/listy-obecnosci/wszystkie', 'listy_obecnosci_wszystkie'],
     ['generator-ankiet', 'Wszystkie ankiety', '/dokumenty/ankiety/wszystkie', 'ankiety_wszystkie'],
     ['generator-dyplomow', 'Wszystkie dyplomy', '/dokumenty/dyplomy/wszystkie', 'dyplomy_wszystkie'],
     ['generator-kart-na-drzwi', 'Wszystkie karty na drzwi', '/dokumenty/karta-na-drzwi/wszystkie', 'karta_na_drzwi_wszystkie'],
     ['generator-checklist-paczek', 'Wszystkie checklisty paczek', '/dokumenty/checklisty-paczek/wszystkie', 'checklisty_paczek_wszystkie'],
+    ['programy-szkolen', 'Wszystkie programy szkoleń', '/dokumenty/programy-szkolen/wszystkie', 'programy_szkolen_wszystkie'],
   ] as const
 
   oczekiwane.forEach(([klucz, etykieta, sciezka, widok]) => {
@@ -82,8 +83,7 @@ test('pięć modułów ma spójne trasy i pozycje Wszystkie', () => {
     assert.equal(pozycje?.[0]?.etykieta.startsWith('Now'), true)
     assert.equal(pozycje?.[1]?.etykieta, 'Kopie robocze')
     assert.deepEqual(pozycje?.[2], { widok, etykieta, sciezka })
-    assert.equal(pozycje?.[3]?.etykieta, 'Kosz')
-    assert.equal(pobierzWidokGeneratoraZeSciezki(pozycje?.[3]?.sciezka ?? ''), pozycje?.[3]?.widok)
+    assert.equal(pozycje?.length, 3)
     assert.equal(pobierzWidokGeneratoraZeSciezki(sciezka), widok)
   })
 })

@@ -81,7 +81,7 @@ test('aktualizacja starszej kopii jest widoczna na wspólnej liście według dat
 
 test('kopie Programów używają wspólnej listy i otwierania dokumentów', () => {
   const aplikacja = odczytajZrodlo('../src/aplikacja/layout/UkladAplikacji.tsx')
-  const widokKopii = aplikacja.split("case 'programy_szkolen_kopie_robocze':")[1].split("case 'programy_szkolen_kosz':")[0]
+  const widokKopii = aplikacja.split("case 'programy_szkolen_kopie_robocze':")[1].split("case 'programy_szkolen_wszystkie':")[0]
   assert.match(widokKopii, /WidokKopiiRoboczychDokumentow/)
   assert.match(widokKopii, /typyStale=\{\['PROGRAM_SZKOLENIA'\]\}/)
   assert.match(widokKopii, /otworzDokument=\{otworzDokument\}/)
