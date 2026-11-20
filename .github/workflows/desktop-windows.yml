@@ -53,14 +53,14 @@ jobs:
       POMAGIER_OPIS_ZMIAN: ${{ inputs.opis_zmian }}
     steps:
       - name: Pobranie źródeł
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Konfiguracja Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: 24
-          cache: npm
+          node-version: '24'
+          cache: 'npm'
       - name: Konfiguracja Rust MSVC
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -97,18 +97,42 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run desktop:release
-      - name: Zachowanie instalatora i sum kontrolnych
-        if: ${{ inputs.podpisane || github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-artifact@v4
+      - name: Weryfikacja plików przed publikacją artefaktu
+        id: pliki-windows
+        shell: pwsh
+        env:
+          KATALOG_PLIKOW_WINDOWS: wydanie-desktop/${{ inputs.podpisane && 'podpisane' || 'testowe' }}
+          PODPISANE_WYDANIE_WINDOWS: ${{ inputs.podpisane == true }}
+        run: |
+          $katalog = $env:KATALOG_PLIKOW_WINDOWS
+          $manifest = Get-Content -LiteralPath "$katalog/wersja.json" -Raw | ConvertFrom-Json
+          $nazwa = $manifest.instalator
+          if ($nazwa -cnotmatch '^Ultimate_Pomagier_\d+\.\d+(\.\d+)?_Setup\.exe$') {
+            throw 'Manifest wersji nie wskazuje instalatora NSIS.'
+          }
+
+          $pliki = @($nazwa, "$nazwa.sha256", 'wersja.json')
+          if ($env:PODPISANE_WYDANIE_WINDOWS -eq 'true') {
+            $pliki += "$nazwa.sig", 'latest.json', "windows-$env:POMAGIER_KANAL_AKTUALIZACJI.json", 'wydanie-windows.json'
+          }
+          $sciezki = foreach ($plik in $pliki) {
+            $sciezka = "$katalog/$plik"
+            $dane = Get-Item -LiteralPath $sciezka -ErrorAction Stop
+            if ($dane.PSIsContainer -or $dane.Length -eq 0) { throw "Wymagany plik jest pusty lub nie jest plikiem: $sciezka" }
+            Write-Host "$sciezka ($($dane.Length) B)"
+            $sciezka
+          }
+
+          $suma = (Get-FileHash -LiteralPath "$katalog/$nazwa" -Algorithm SHA256).Hash
+          $zapisanaSuma = (Get-Content -LiteralPath "$katalog/$nazwa.sha256" -Raw).Trim()
+          if ($suma -ne $manifest.sha256 -or $zapisanaSuma -ne "$suma  $nazwa") {
+            throw 'Suma SHA-256 instalatora jest niezgodna z metadanymi wydania.'
+          }
+          (@('sciezki<<PLIKI') + $sciezki + 'PLIKI') | Add-Content -LiteralPath $env:GITHUB_OUTPUT -Encoding utf8
+      - name: Publikacja artefaktu Windows
+        uses: actions/upload-artifact@v7
         with:
           name: Ultimate-Pomagier-Windows-${{ github.run_number }}
-          path: |
-            wydanie-desktop/testowe/Ultimate_Pomagier_*.exe*
-            wydanie-desktop/testowe/wersja.json
-            wydanie-desktop/podpisane/Ultimate_Pomagier_*.exe*
-            wydanie-desktop/podpisane/wersja.json
-            wydanie-desktop/podpisane/latest.json
-            wydanie-desktop/podpisane/windows-*.json
-            wydanie-desktop/podpisane/wydanie-windows.json
+          path: ${{ steps.pliki-windows.outputs.sciezki }}
           if-no-files-found: error
           retention-days: 30

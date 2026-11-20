@@ -20,12 +20,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version: '24'
+          package-manager-cache: false
       - name: Publikacja wyłącznie istniejącego szkicu po akceptacji
         env:
           GH_TOKEN: ${{ github.token }}
