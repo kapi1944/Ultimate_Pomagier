@@ -480,7 +480,8 @@ test('checklisty: routing, formularz, zapis, stare dane, eksport i izolacja awar
       ['/dokumenty/programy-szkolen', 'Program'],
     ]) {
       await strona.goto(adres + sciezka)
-      await strona.locator('main.uklad-aplikacji__obszar-roboczy').waitFor()
+      // Widoki są ładowane leniwie, więc zawartość pojawia się chwilę po powłoce.
+      await strona.locator('main.uklad-aplikacji__obszar-roboczy').filter({ hasText: new RegExp(etykieta, 'i') }).waitFor()
       assert.match(await strona.locator('main.uklad-aplikacji__obszar-roboczy').innerText(), new RegExp(etykieta, 'i'))
       assert.equal(await strona.getByRole('button', { name: 'Ponów próbę', exact: true }).count(), 0)
     }
