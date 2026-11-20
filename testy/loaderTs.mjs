@@ -27,3 +27,11 @@ export async function resolve(specifier, context, defaultResolve) {
     return defaultResolve(pathToFileURL(sciezkaTs).href, context, defaultResolve)
   }
 }
+
+// Odpowiednik importu `?raw` z Vite: moduł eksportuje zawartość pliku jako tekst.
+export async function load(url, context, nextLoad) {
+  if (!url.startsWith('file:') || new URL(url).search !== '?raw') return nextLoad(url, context)
+  const { readFile } = await import('node:fs/promises')
+  const tresc = await readFile(fileURLToPath(new URL(url.split('?')[0])), 'utf8')
+  return { format: 'module', source: `export default ${JSON.stringify(tresc)}`, shortCircuit: true }
+}

@@ -3,9 +3,34 @@ import { importujLokalizacjeZCsv } from './importerLokalizacji'
 import type { Lokalizacja } from './typyLokalizacji'
 
 const kluczLokalizacji = 'ultimate-pomagier.kartoteki.lokalizacje'
-const wynikImportuStartowego = importujLokalizacjeZCsv(tekstLokalizacjiCsv)
-const lokalizacjeStartowe = wynikImportuStartowego.lokalizacje
-const lokalizacjeStartoweWedlugKlucza = new Map(lokalizacjeStartowe.map((lokalizacja) => [lokalizacja.klucz_lokalizacji, lokalizacja]))
+
+// Kartoteka startowa liczy ponad 70 tys. rekordów. Parsowanie na poziomie modułu blokowało start całej aplikacji,
+// dlatego dane są budowane dopiero przy pierwszym użyciu (albo w rozgrzewce po pierwszym renderze).
+type DaneStartowe = {
+  wynikImportu: ReturnType<typeof importujLokalizacjeZCsv>
+  lokalizacje: Lokalizacja[]
+  wedlugKlucza: Map<string, Lokalizacja>
+}
+
+let daneStartowe: DaneStartowe | null = null
+
+function pobierzDaneStartowe(): DaneStartowe {
+  if (!daneStartowe) {
+    const wynikImportu = importujLokalizacjeZCsv(tekstLokalizacjiCsv)
+    daneStartowe = {
+      wynikImportu,
+      lokalizacje: wynikImportu.lokalizacje,
+      wedlugKlucza: new Map(wynikImportu.lokalizacje.map((lokalizacja) => [lokalizacja.klucz_lokalizacji, lokalizacja])),
+    }
+  }
+
+  return daneStartowe
+}
+
+/** Przygotowuje kartotekę startową w czasie bezczynności, aby pierwszy widok korzystający z lokalizacji nie czekał na parsowanie. */
+export function rozgrzejKartotekeLokalizacji() {
+  pobierzDaneStartowe()
+}
 
 function czyObiekt(wartosc: unknown): wartosc is Record<string, unknown> {
   return Boolean(wartosc && typeof wartosc === 'object' && !Array.isArray(wartosc))
@@ -42,9 +67,16 @@ function normalizujLokalizacje(wartosc: unknown): Lokalizacja | null {
   return lokalizacja
 }
 
-function odczytajLokalizacjeZMagazynu() {
+function odczytajZapisLokalizacji() {
   try {
-    const zapis = localStorage.getItem(kluczLokalizacji)
+    return localStorage.getItem(kluczLokalizacji)
+  } catch {
+    return null
+  }
+}
+
+function odczytajLokalizacjeZMagazynu(zapis: string | null) {
+  try {
     const dane = zapis ? JSON.parse(zapis) : null
 
     return Array.isArray(dane) ? dane.map(normalizujLokalizacje).filter((lokalizacja): lokalizacja is Lokalizacja => Boolean(lokalizacja)) : []
@@ -64,19 +96,32 @@ function scalLokalizacje(seed: Lokalizacja[], zapisane: Lokalizacja[]) {
 }
 
 export function pobierzLokalizacjeStartowe() {
-  return lokalizacjeStartowe
+  return pobierzDaneStartowe().lokalizacje
 }
 
 export function pobierzBledyImportuStartowego() {
-  return wynikImportuStartowego.bledy
+  return pobierzDaneStartowe().wynikImportu.bledy
 }
 
+// Scalona lista jest pamiętana dla tego samego zapisu w localStorage, bo budowanie mapy 70 tys. rekordów
+// przy każdym wywołaniu było kosztowne. Zwracana lista jest współdzielona i nie wolno jej modyfikować w miejscu.
+let pamiecScalonychLokalizacji: { zapis: string | null; lokalizacje: Lokalizacja[] } | null = null
+
 export function pobierzLokalizacjeZMagazynu() {
-  return scalLokalizacje(lokalizacjeStartowe, odczytajLokalizacjeZMagazynu())
+  const zapis = odczytajZapisLokalizacji()
+
+  if (pamiecScalonychLokalizacji && pamiecScalonychLokalizacji.zapis === zapis) {
+    return pamiecScalonychLokalizacji.lokalizacje
+  }
+
+  const lokalizacje = scalLokalizacje(pobierzDaneStartowe().lokalizacje, odczytajLokalizacjeZMagazynu(zapis))
+  pamiecScalonychLokalizacji = { zapis, lokalizacje }
+  return lokalizacje
 }
 
 export function zapiszLokalizacjeWMagazynie(lokalizacje: Lokalizacja[]) {
   try {
+    const lokalizacjeStartoweWedlugKlucza = pobierzDaneStartowe().wedlugKlucza
     const zmianyUzytkownika = lokalizacje.filter((lokalizacja) => {
       const lokalizacjaStartowa = lokalizacjeStartoweWedlugKlucza.get(lokalizacja.klucz_lokalizacji)
 
