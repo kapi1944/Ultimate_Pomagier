@@ -105,7 +105,8 @@ test('cyfrowy PDF: dwie strony bez OCR, mały ekran, zachowanie korekt, anulowan
   try {
     const strona = await przygotujStrone(przegladarka, 390)
     const zasobyOcr = []
-    strona.on('request', (zadanie) => { if (zadanie.url().includes('/ocr/')) zasobyOcr.push(zadanie.url()) })
+    // Liczą się zasoby silnika OCR; ładowanie kodu źródłowego (/src/) może wynikać z pobierania widoków w tle.
+    strona.on('request', (zadanie) => { if (zadanie.url().includes('/ocr/') && !zadanie.url().includes('/src/')) zasobyOcr.push(zadanie.url()) })
     await strona.locator('.importer-ocr input[type=file]').setInputFiles({ name: 'lista.pdf', mimeType: 'application/pdf', buffer: pdfTekstowy() })
     await strona.getByRole('button', { name: 'Rozpocznij analizę', exact: true }).click()
     await strona.locator('.importer-ocr [role=status]').filter({ hasText: 'Odczyt zakończony' }).waitFor()
