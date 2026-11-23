@@ -73,7 +73,8 @@ export function EdytorProgramuWysiwyg({
   })
 
   useEffect(() => {
-    if (!edytor) {
+    // Po ponownym podłączeniu efektów (np. przez Suspense) edytor może być już zniszczony — wtedy nie wolno odczytywać jego stanu.
+    if (!edytor || edytor.isDestroyed) {
       return
     }
 
@@ -84,7 +85,7 @@ export function EdytorProgramuWysiwyg({
   }, [edytor, wartoscHtml])
 
   useEffect(() => {
-    if (!edytor) return
+    if (!edytor || edytor.isDestroyed) return
     const rozszerzenie = edytor.extensionManager.extensions.find((element) => element.name === 'oznaczeniaProgramu')
     if (rozszerzenie) {
       rozszerzenie.options.wcieciaPresetu = wcieciaPresetu
