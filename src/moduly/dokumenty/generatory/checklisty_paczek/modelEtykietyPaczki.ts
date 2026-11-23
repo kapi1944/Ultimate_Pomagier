@@ -2,6 +2,7 @@ import { pobierzLogoOrganizatora } from '../../../../wspolne/dokumenty/logoOrgan
 import { zbudujKontekstZeSzczegolow } from '../../../../wspolne/integracje/szczegolyDoDokumentow/zbudujKontekstZeSzczegolow'
 import { czyPozycjaJestAktywna, formatujDateDoWydruku, pobierzDaneSzkoleniaChecklisty, pobierzIloscPozycji } from './modelChecklistyPaczki'
 import type { DokumentChecklistyPaczki, SzczegolyDoChecklisty } from './rejestrChecklistPaczek'
+import { normalizujUstawieniaEtykiety } from './ustawieniaEtykietyPaczki'
 
 export const celeEtykiety = { s: 'Szczegóły', k: 'Kompletowanie', m: 'Materiały' } as const
 export type CelEtykiety = keyof typeof celeEtykiety
@@ -32,6 +33,7 @@ export function odczytajPaczkeZKotwicy(kotwica: string) {
 
 export function pobierzEtykietyPaczek(dokument: DokumentChecklistyPaczki, szczegoly?: SzczegolyDoChecklisty) {
   const dane = dokument.daneDokumentu
+  const ustawienia = normalizujUstawieniaEtykiety(dane.ustawieniaEtykiety)
   const biezace = pobierzDaneSzkoleniaChecklisty(dane)
   const grupa = szczegoly && dane.grupaId ? zbudujKontekstZeSzczegolow(szczegoly.zrodloKontekstu).grupy.find((grupa) => grupa.id === dane.grupaId) : undefined
   const migawka = dane.migawkaZrodla
@@ -54,7 +56,9 @@ export function pobierzEtykietyPaczek(dokument: DokumentChecklistyPaczki, szczeg
         id: pozycja.id, nazwa: pozycja.nazwa, ilosc: pobierzIloscPozycji(pozycja, uczestnicy, new Set(terminy).size).koncowa,
         uwagi: pozycja.uwagiDrukowane,
       }))
-    const pozycje = pozycjeZrodlowe.map((pozycja) => ({ ...pozycja, ...korekta?.pozycje?.[pozycja.id] }))
+    const pozycje = ustawienia.rodzaj === 'uniwersalna'
+      ? ustawienia.pozycjeUniwersalne.map((pozycja) => ({ ...pozycja, uwagi: '' }))
+      : pozycjeZrodlowe.map((pozycja) => ({ ...pozycja, czyUkryta: false, ...korekta?.pozycje?.[pozycja.id] }))
     const tresc = {
       paczkaId: paczka.id, nazwaPaczki: paczka.nazwa, numer: indeks + 1, razem: paczki.length, organizator, logo,
       kod: korekta?.kod ?? szczegoly?.dane.kodSzkolenia?.trim() ?? '',
@@ -62,7 +66,7 @@ export function pobierzEtykietyPaczek(dokument: DokumentChecklistyPaczki, szczeg
       grupa: wybierz(biezace.nazwaGrupy, migawka?.nazwaGrupy, grupa?.nazwa), uczestnicy, miasto, miejsce,
       termin: terminy.map(formatujDateDoWydruku).join(', '),
       trenerzy: wybierz(biezace.trenerzy, migawka?.trenerzy, grupa?.trenerzy.map((trener) => trener.imieINazwisko)),
-      uwagi: korekta?.uwagi ?? szczegoly?.dane.odbiorcaPaczki.informacjaNaEtykiecie ?? '', pozycje,
+      uwagi: korekta?.uwagi ?? szczegoly?.dane.odbiorcaPaczki.informacjaNaEtykiecie ?? '', pozycje, ustawienia,
     }
     const odcisk = JSON.stringify([dane.szczegolyOrganizacyjneId, dane.grupaId, tresc, szczegoly?.dane.odbiorcaPaczki.informacjaNaEtykiecie,
       grupa?.daty, grupa?.liczbaUczestnikow, grupa?.nazwa, korekta?.pozycje ? pozycjeZrodlowe : null])

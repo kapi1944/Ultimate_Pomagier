@@ -13,6 +13,8 @@ import { zbudujNazweEksportowanegoDokumentu, utworzIdentyfikatorDokumentu } from
 import { repozytoriumWspolnychDokumentow } from '../src/wspolne/dokumenty/rejestrDokumentow.ts'
 import { zakodujAdresEtykiety } from '../src/moduly/dokumenty/generatory/checklisty_paczek/kodQrEtykiety.ts'
 import { odczytajCelEtykiety, pobierzEtykietyPaczek, utworzAdresyEtykiety } from '../src/moduly/dokumenty/generatory/checklisty_paczek/modelEtykietyPaczki.ts'
+import { normalizujUstawieniaEtykiety, utworzUstawieniaEtykiety } from '../src/moduly/dokumenty/generatory/checklisty_paczek/ustawieniaEtykietyPaczki.ts'
+import { pobierzSzablonyChecklistPaczek, pobierzSzablonyEtykietPaczek, zapiszNowySzablonChecklisty } from '../src/moduly/dokumenty/generatory/checklisty_paczek/szablonyChecklistPaczek.ts'
 import {
   czyMoznaEksportowacCheckliste,
   pobierzDaneSzkoleniaChecklisty,
@@ -60,6 +62,76 @@ import {
 
 const magazyn = new Map<string, string>()
 globalThis.localStorage = { getItem: (klucz: string) => magazyn.get(klucz) ?? null, setItem: (klucz: string, wartosc: string) => magazyn.set(klucz, wartosc), removeItem: (klucz: string) => magazyn.delete(klucz), clear: () => magazyn.clear(), key: () => null, length: 0 } as Storage
+
+test('etykieta uniwersalna ma wspólny katalog, puste ilości i nie zmienia źródła ani identyfikatorów', () => {
+  magazyn.clear()
+  const dokument = utworzRecznaChecklistePaczki('autor')!
+  const przed = structuredClone(dokument.daneDokumentu)
+  const ustawienia = utworzUstawieniaEtykiety('uniwersalna')
+  const wynik = pobierzEtykietyPaczek({ ...dokument, daneDokumentu: { ...przed, ustawieniaEtykiety: ustawienia } })[0]
+  assert.equal(wynik.pozycje.length, 13)
+  assert.ok(wynik.pozycje.every((pozycja) => pozycja.ilosc === null && !pozycja.czyUkryta))
+  for (const pozycja of przed.pozycje) assert.ok(wynik.pozycje.some((material) => material.nazwa === pozycja.nazwa))
+  assert.ok(wynik.pozycje.some((pozycja) => pozycja.nazwa === 'Program szkolenia'))
+  assert.ok(wynik.pozycje.some((pozycja) => pozycja.nazwa === 'Materiały promocyjne'))
+  assert.deepEqual(dokument.daneDokumentu, przed)
+  assert.equal(wynik.paczkaId, przed.paczki[0].id)
+})
+
+test('normalizacja ustawień zachowuje puste ilości, zero, kolejność i starsze dane', () => {
+  const ustawienia = normalizujUstawieniaEtykiety({ rodzaj: 'uniwersalna', dopasowanie: 'nieznane', pola: { logo: false },
+    pozycjeUniwersalne: [{ id: 'b', nazwa: 'Własne', ilosc: 0 }, { id: 'a', nazwa: '', ilosc: null }, { id: 'b', nazwa: 'Duplikat' }, { id: 'c', nazwa: 'Błędna ilość', ilosc: -1 }] })
+  assert.equal(ustawienia.dopasowanie, 'automatyczne')
+  assert.equal(ustawienia.pola.logo, false)
+  assert.deepEqual(ustawienia.pozycjeUniwersalne.map((pozycja) => [pozycja.id, pozycja.ilosc]), [['b', 0], ['a', null], ['c', null]])
+  assert.deepEqual(normalizujUstawieniaEtykiety(undefined), utworzUstawieniaEtykiety())
+  assert.deepEqual(normalizujUstawieniaEtykiety(JSON.parse(JSON.stringify(ustawienia))), ustawienia)
+})
+
+test('własne szablony wydruku współistnieją ze starszymi bez limitu i bez kopiowania checklisty', () => {
+  magazyn.clear()
+  const dane = utworzDomyslneDaneChecklisty({ identyfikator: 'szablon', numerDzienny: 1 })
+  const starszy = utworzSzablonChecklistyPaczki(dane, 'Starsza struktura')!
+  zapiszNowySzablonChecklisty(starszy)
+  for (let indeks = 0; indeks < 45; indeks++) zapiszNowySzablonChecklisty({ id: `wydruk-${indeks}`, nazwa: `Wydruk ${indeks}`, utworzono: '2026-11-23',
+    przeznaczenie: 'etykieta', ustawieniaEtykiety: utworzUstawieniaEtykiety('uniwersalna'), paczki: [], kategorie: [], pozycje: [] })
+  assert.equal(pobierzSzablonyEtykietPaczek().length, 45)
+  assert.deepEqual(pobierzSzablonyChecklistPaczek(), [starszy])
+  assert.ok(pobierzSzablonyEtykietPaczek().every((szablon) => !szablon.pozycje.length && !szablon.paczki.length && szablon.ustawieniaEtykiety.pozycjeUniwersalne.every((pozycja) => pozycja.ilosc === null)))
+  const poprzedniZapis = localStorage.setItem
+  const przed = [...magazyn.entries()]
+  try {
+    localStorage.setItem = () => { throw new DOMException('Pełny magazyn', 'QuotaExceededError') }
+    assert.throws(() => zapiszNowySzablonChecklisty({ ...starszy, id: 'nowy', nazwa: 'Odmowa' }), /Pełny magazyn/)
+    assert.deepEqual([...magazyn.entries()], przed)
+  } finally { localStorage.setItem = poprzedniZapis }
+})
+
+test('odcisk etykiety obejmuje wariant, widoczność, szablon i korekty bez zmiany źródłowych ilości', () => {
+  magazyn.clear()
+  const dokument = utworzRecznaChecklistePaczki('autor')!
+  const [etykieta] = pobierzEtykietyPaczek(dokument)
+  const ustawienia = utworzUstawieniaEtykiety()
+  for (const zmiana of [{ rodzaj: 'uniwersalna' as const }, { pola: { ...ustawienia.pola, termin: true } }, { szablon: 'wlasny' }, { dopasowanie: 'kompakt' as const }]) {
+    assert.notEqual(pobierzEtykietyPaczek({ ...dokument, daneDokumentu: { ...dokument.daneDokumentu, ustawieniaEtykiety: { ...ustawienia, ...zmiana } } })[0].odcisk, etykieta.odcisk)
+  }
+  const pozycja = etykieta.pozycje[0]
+  const zmieniona = pobierzEtykietyPaczek({ ...dokument, daneDokumentu: { ...dokument.daneDokumentu,
+    korektyEtykiet: { [etykieta.paczkaId]: { pozycje: { [pozycja.id]: { ilosc: 99, czyUkryta: true } } } } } })[0]
+  assert.notEqual(zmieniona.odcisk, etykieta.odcisk)
+  assert.equal(zmieniona.pozycje[0].czyUkryta, true)
+  assert.notEqual(pobierzEtykietyPaczek(dokument)[0].pozycje[0].ilosc, 99)
+  assert.equal(pobierzEtykietyPaczek(dokument)[0].odcisk, etykieta.odcisk)
+})
+
+for (const liczba of [5, 8, 12, 16, 20, 40]) test(`etykieta zachowuje ${liczba} pozycji, kolejność, polskie nazwy i ilości`, () => {
+  magazyn.clear()
+  const dokument = utworzRecznaChecklistePaczki('autor')!
+  const dane = dokument.daneDokumentu
+  dane.pozycje = Array.from({ length: liczba }, (_, indeks) => ({ ...dane.pozycje[0], id: `material-${indeks}`, kolejnosc: indeks, nazwa: `Zażółć gęślą jaźń ${indeks}`, nadpisanieReczne: indeks }))
+  const [wynik] = pobierzEtykietyPaczek(dokument)
+  assert.deepEqual(wynik.pozycje.map((pozycja) => [pozycja.id, pozycja.nazwa, pozycja.ilosc]), dane.pozycje.map((pozycja, indeks) => [pozycja.id, pozycja.nazwa, indeks]))
+})
 
 function utworzKontekst(): KontekstDokumentuSzkolenia {
   return {

@@ -219,8 +219,11 @@ test('etykiety: format PDF, trzy paczki, trzy cele, logowanie i ponowny druk', {
     const panel = strona.getByRole('region', { name: 'Etykiety paczek', exact: true })
     const strony = panel.locator('[data-etykieta]')
     assert.equal(await strony.count(), 3)
+    await panel.getByText('Treść i własne szablony', { exact: true }).click()
+    await panel.getByRole('checkbox', { name: 'Grupa', exact: true }).check()
+    await panel.getByRole('checkbox', { name: 'Liczba uczestników', exact: true }).check()
     assert.match(await strony.nth(1).innerText(), /2 \/ 3[\s\S]*Grupa Beta[\s\S]*Uczestnicy: 13/)
-    assert.match(await strony.first().innerText(), /13 szt\.[\s\S]*2 szt\./)
+    assert.deepEqual(await strony.first().locator('tbody td:last-child').allTextContents(), ['13', '2'])
     assert.match(await strony.first().innerText(), /IIST-311/)
     assert.equal(await strony.first().getAttribute('data-tryb'), 'termiczny')
     assert.equal(await strony.first().getByRole('img', { name: 'IIST' }).count(), 1)
@@ -257,13 +260,14 @@ test('etykiety: format PDF, trzy paczki, trzy cele, logowanie i ponowny druk', {
     await panel.getByLabel('Wysokość (mm)', { exact: true }).fill('90')
     await pobierzPdf('Pobierz PDF etykiety', 125, 90, 1)
     if (!await panel.locator('.etykiety-paczek__korekta').getAttribute('open').then((wartosc) => wartosc !== null)) await panel.getByText('Korekta treści do wydruku', { exact: true }).click()
-    await panel.getByLabel('Kod szkolenia', { exact: true }).fill('POZ-311')
-    await panel.getByLabel('Kod szkolenia', { exact: true }).press('Tab')
+    await panel.getByRole('textbox', { name: 'Kod szkolenia', exact: true }).fill('POZ-311')
+    await panel.getByRole('textbox', { name: 'Kod szkolenia', exact: true }).press('Tab')
     await panel.getByRole('alert').filter({ hasText: 'Nieaktualna etykieta' }).waitFor()
     assert.match(await strony.first().innerText(), /POZ-311/)
     await panel.getByLabel('Uwagi etykiety', { exact: true }).fill('Bardzo długie uwagi do wydruku. '.repeat(120))
     await panel.getByLabel('Uwagi etykiety', { exact: true }).press('Tab')
-    await panel.getByRole('alert').filter({ hasText: 'Wybierz wyższy format dla paczek' }).waitFor()
+    await panel.getByRole('checkbox', { name: 'Uwagi dodatkowe', exact: true }).check()
+    await panel.getByRole('alert').filter({ hasText: 'Nie wszystkie pozycje mieszczą się na etykiecie' }).waitFor()
     assert.equal(await panel.getByRole('button', { name: 'Pobierz PDF etykiety', exact: true }).isDisabled(), true)
     await panel.getByLabel('Paczka', { exact: true }).selectOption(dane.drugaId)
     const cele = Object.fromEntries(await panel.getByRole('navigation', { name: 'Cele etykiety' }).getByRole('link').evaluateAll((linki) =>
@@ -864,5 +868,157 @@ test('checklista A4: bezpośredni druk, anulowanie, wersje i niezależny PDF', {
     assert.equal(await strona.getByText(/^Wydruk v1:/).count(), 1)
     assert.equal(await strona.getByText(/Wydruk v2:/).count(), 0)
     assert.equal(await strona.getByText(/Utworzono PDF w wersji v01/).count(), 1)
+  } finally { await przegladarka.close() }
+})
+
+test('etykiety adaptacyjne: rzeczywiste PDF, geometria, 5–40 pozycji i trwały szablon uniwersalny', { timeout: 240000 }, async () => {
+  const przegladarka = await chromium.launch({ ...opcjePrzegladarki, headless: true })
+  try {
+    await mkdir('tmp/etykiety-adaptacyjne', { recursive: true })
+    const strona = await przegladarka.newPage({ acceptDownloads: true, viewport: { width: 1440, height: 1000 } })
+    strona.setDefaultTimeout(15000)
+    const bledy = []
+    const wyniki = []
+    strona.on('pageerror', (blad) => bledy.push(blad.message))
+    await strona.goto(adres + '/dokumenty/checklisty-paczek')
+    await strona.getByRole('button', { name: 'Otwórz demonstrację Architekta', exact: true }).click()
+    await strona.getByLabel('Tytuł szkolenia', { exact: true }).waitFor()
+    const adresDokumentu = strona.url()
+    const panel = strona.getByRole('region', { name: 'Etykiety paczek', exact: true })
+    const etykieta = panel.locator('[data-etykieta]').first()
+    const eksport = panel.getByRole('button', { name: 'Pobierz PDF etykiety', exact: true })
+    async function otworz() {
+      await strona.goto(adresDokumentu)
+      await strona.getByRole('button', { name: 'Etykiety paczek', exact: true }).click()
+    }
+    async function sprawdzPdf(nazwa, szerokosc, wysokosc, nazwy) {
+      const [pobrany] = await Promise.all([strona.waitForEvent('download'), eksport.click()])
+      const bajty = await readFile(await pobrany.path())
+      await writeFile('tmp/etykiety-adaptacyjne/' + nazwa + '.pdf', bajty)
+      const dokument = await PDFDocument.load(bajty)
+      assert.equal(dokument.getPageCount(), 1)
+      assert.ok(Math.abs(dokument.getPage(0).getWidth() * 25.4 / 72 - szerokosc) < .01)
+      assert.ok(Math.abs(dokument.getPage(0).getHeight() * 25.4 / 72 - wysokosc) < .01)
+      const zadanieOdczytu = getDocument({ data: new Uint8Array(bajty), useSystemFonts: true })
+      const odczyt = await zadanieOdczytu.promise
+      try {
+        const stronaPdf = await odczyt.getPage(1)
+        const tekst = await stronaPdf.getTextContent()
+        const tresc = tekst.items.map((element) => element.str ?? '').join('').replace(/\s/g, '')
+        for (const material of nazwy) assert.ok(tresc.includes(material.replace(/\s/g, '')), `PDF nie zawiera całej nazwy: ${material}`)
+        for (const element of tekst.items.filter((element) => element.str?.trim())) {
+          assert.ok(element.transform[4] >= 3 * 72 / 25.4, 'Tekst przekroczył lewy margines PDF')
+          assert.ok(element.transform[4] + element.width <= (szerokosc - 3) * 72 / 25.4, 'Tekst przekroczył prawy margines PDF')
+          assert.ok(element.transform[5] > 3 * 72 / 25.4 && element.transform[5] < (wysokosc - 3) * 72 / 25.4, 'Tekst przekroczył pionowy margines PDF')
+        }
+        return tresc
+      } finally { await zadanieOdczytu.destroy() }
+    }
+    for (const liczba of [5, 8, 12, 16, 20, 40]) {
+      const nazwy = await strona.evaluate(async (liczba) => {
+        const { pobierzChecklistePaczki, zapiszChecklistePaczki } = await import('/src/moduly/dokumenty/generatory/checklisty_paczek/rejestrChecklistPaczek.ts')
+        const { utworzUstawieniaEtykiety } = await import('/src/moduly/dokumenty/generatory/checklisty_paczek/ustawieniaEtykietyPaczki.ts')
+        const dokument = pobierzChecklistePaczki(decodeURIComponent(location.pathname.split('/').at(-1)))
+        const dane = dokument.daneDokumentu
+        dane.ustawieniaEtykiety = utworzUstawieniaEtykiety()
+        dane.pozycje = Array.from({ length: liczba }, (_, indeks) => ({ ...dane.pozycje[0], id: 'material-' + indeks, kolejnosc: indeks,
+          nazwa: indeks === 0 ? 'Zażółć gęślą jaźń — podręczniki oraz ćwiczenia dla uczestników szkolenia' : 'Materiał szkoleniowy ' + (indeks + 1),
+          regulaIlosci: { typ: 'STALA', wartoscStala: indeks + 1 }, nadpisanieReczne: null }))
+        zapiszChecklistePaczki(dokument.id, dane, null)
+        return dane.pozycje.map((pozycja) => pozycja.nazwa)
+      }, liczba)
+      await otworz()
+      for (const [szerokosc, wysokosc] of [[100, 150], [100, 100], [125, 90]]) {
+        await panel.getByLabel('Format etykiety', { exact: true }).selectOption(szerokosc === 100 ? String(wysokosc) : 'wlasny')
+        if (szerokosc !== 100) {
+          await panel.getByLabel('Szerokość (mm)', { exact: true }).fill(String(szerokosc))
+          await panel.getByLabel('Szerokość (mm)', { exact: true }).press('Tab')
+          await panel.getByLabel('Wysokość (mm)', { exact: true }).fill(String(wysokosc))
+          await panel.getByLabel('Wysokość (mm)', { exact: true }).press('Tab')
+        }
+        for (const tryb of ['termiczny', 'kolorowy']) {
+          await panel.getByLabel('Tryb druku', { exact: true }).selectOption(tryb)
+          assert.deepEqual(await etykieta.locator('tbody td:nth-child(2)').allTextContents(), nazwy)
+          assert.deepEqual(await etykieta.locator('tbody td:last-child').allTextContents(), nazwy.map((_, indeks) => String(indeks + 1)))
+          assert.equal(await etykieta.locator('.etykieta-paczki__checkbox').count(), liczba)
+          const pomiar = await etykieta.evaluate(async (element) => {
+            const { czyEtykietaPrzepelniona } = await import('/src/moduly/dokumenty/generatory/checklisty_paczek/dopasowanieEtykietyPaczki.ts')
+            const skala = element.getBoundingClientRect().width / parseFloat(getComputedStyle(element).width)
+            const pola = [...element.querySelectorAll('.etykieta-paczki__checkbox')]
+            return { przepelnienie: czyEtykietaPrzepelniona(element), wariant: element.dataset.zageszczenie,
+              pola: pola.map((pole) => ({ rozmiar: pole.getBoundingClientRect().width / skala * 25.4 / 96, tekst: pole.textContent })),
+              przewijanie: getComputedStyle(element).overflow,
+              rozmiarNazwy: parseFloat(getComputedStyle(element.querySelector('tbody td:nth-child(2)')).fontSize) * 72 / 96 }
+          })
+          assert.ok(pomiar.pola.every((pole) => pole.rozmiar >= 3.5 && pole.tekst === ''))
+          assert.ok(pomiar.rozmiarNazwy >= 7.5)
+          assert.equal(pomiar.przewijanie, 'visible')
+          assert.equal(await eksport.isDisabled(), pomiar.przepelnienie)
+          wyniki.push({ liczba, szerokosc, wysokosc, tryb, ...pomiar })
+          if (pomiar.przepelnienie) {
+            assert.match(await panel.getByRole('alert').allTextContents().then((teksty) => teksty.join(' ')), /Nie wszystkie pozycje mieszczą się na etykiecie/)
+            assert.equal(pomiar.wariant, 'maksymalny')
+          } else await sprawdzPdf(`${liczba}-${szerokosc}x${wysokosc}-${tryb}`, szerokosc, wysokosc, nazwy)
+        }
+      }
+    }
+    assert.ok(wyniki.some((wynik) => wynik.wariant === 'kompakt' && !wynik.przepelnienie))
+    assert.ok(wyniki.some((wynik) => wynik.wariant === 'maksymalny' && !wynik.przepelnienie))
+    assert.ok(wyniki.filter((wynik) => wynik.liczba === 40).every((wynik) => wynik.przepelnienie))
+    await panel.getByLabel('Dopasowanie zawartości', { exact: true }).selectOption('standard')
+    assert.equal(await etykieta.getAttribute('data-zageszczenie'), 'standard')
+    assert.equal(await eksport.isDisabled(), true)
+    await panel.getByLabel('Dopasowanie zawartości', { exact: true }).selectOption('automatyczne')
+    await panel.getByLabel('Format etykiety', { exact: true }).selectOption('150')
+    await panel.getByLabel('Rodzaj etykiety', { exact: true }).selectOption('uniwersalna')
+    assert.equal(await etykieta.locator('tbody tr').count(), 13)
+    assert.ok((await etykieta.locator('tbody td:last-child').allTextContents()).every((tekst) => tekst === ''))
+    assert.doesNotMatch(await etykieta.innerText(), /Kod niepodany|Szkolenie bez tytułu|Uczestnicy|Kody QR|QR TESTOWE/)
+    assert.equal(await etykieta.locator('.etykieta-paczki__qr').count(), 0)
+    await panel.getByLabel('Nazwa materiału uniwersalnego: 1', { exact: true }).fill('Własne zażółcone materiały')
+    await panel.getByLabel('Nazwa materiału uniwersalnego: 1', { exact: true }).press('Tab')
+    await panel.getByLabel('Ilość materiału uniwersalnego: 1', { exact: true }).fill('7')
+    await panel.getByLabel('Ilość materiału uniwersalnego: 1', { exact: true }).press('Tab')
+    await panel.getByRole('button', { name: 'W dół: materiał uniwersalny 1', exact: true }).click()
+    assert.equal(await panel.getByLabel('Nazwa materiału uniwersalnego: 2', { exact: true }).inputValue(), 'Własne zażółcone materiały')
+    await panel.getByLabel('Pokaż materiał uniwersalny: 1', { exact: true }).uncheck()
+    await panel.getByRole('button', { name: 'Dodaj własny materiał', exact: true }).click()
+    await panel.getByRole('button', { name: 'Dodaj pusty wiersz', exact: true }).click()
+    await panel.getByText('Treść i własne szablony', { exact: true }).click()
+    await panel.getByLabel('Nazwa szablonu wydruku', { exact: true }).fill('Uniwersalny własny')
+    await panel.getByRole('button', { name: 'Zapisz szablon wydruku', exact: true }).click()
+    await otworz()
+    assert.equal(await panel.getByLabel('Rodzaj etykiety', { exact: true }).inputValue(), 'uniwersalna')
+    assert.equal(await panel.getByLabel('Nazwa materiału uniwersalnego: 2', { exact: true }).inputValue(), 'Własne zażółcone materiały')
+    assert.equal(await panel.getByLabel('Ilość materiału uniwersalnego: 2', { exact: true }).inputValue(), '7')
+    const nazwyUniwersalne = await etykieta.locator('tbody td:nth-child(2)').allTextContents()
+    await sprawdzPdf('uniwersalna-wlasna', 100, 150, nazwyUniwersalne)
+    await etykieta.screenshot({ path: 'tmp/etykiety-adaptacyjne/uniwersalna.png' })
+    await panel.getByLabel('Szablon wydruku', { exact: true }).selectOption('standard')
+    await panel.getByLabel('Szablon wydruku', { exact: true }).selectOption({ label: 'Uniwersalny własny' })
+    assert.deepEqual(await etykieta.locator('tbody td:nth-child(2)').allTextContents(), nazwyUniwersalne)
+    for (const szerokosc of [390, 768, 1024, 1440, 1920]) {
+      await strona.setViewportSize({ width: szerokosc, height: 1000 })
+      for (const skala of [75, 85, 100, 125]) {
+        await strona.evaluate(async (skala) => {
+          const { zastosujSkaleInterfejsu } = await import('/src/aplikacja/ustawienia/skalaInterfejsu.ts')
+          await zastosujSkaleInterfejsu(skala)
+        }, skala)
+        const pomiar = await strona.locator('.checklista-paczki').evaluate((element) => ({ szerokosc: element.clientWidth, tresc: element.scrollWidth }))
+        assert.ok(pomiar.tresc <= pomiar.szerokosc + 2, `Uniwersalna ${szerokosc}px / ${skala}%: poziome przepełnienie modułu`)
+      }
+    }
+    assert.equal(await strona.evaluate(async () => {
+      const { pobierzChecklistePaczki } = await import('/src/moduly/dokumenty/generatory/checklisty_paczek/rejestrChecklistPaczek.ts')
+      return pobierzChecklistePaczki(decodeURIComponent(location.pathname.split('/').at(-1))).daneDokumentu.pozycje.length
+    }), 40)
+    await writeFile('tmp/etykiety-adaptacyjne/wyniki.json', JSON.stringify(wyniki, null, 2))
+    assert.deepEqual(bledy, [])
+  } catch (blad) {
+    for (const strona of przegladarka.contexts().flatMap((kontekst) => kontekst.pages())) {
+      await strona.screenshot({ path: 'tmp/etykiety-adaptacyjne/blad.png' })
+      await writeFile('tmp/etykiety-adaptacyjne/blad.txt', await strona.locator('body').innerText())
+    }
+    throw blad
   } finally { await przegladarka.close() }
 })

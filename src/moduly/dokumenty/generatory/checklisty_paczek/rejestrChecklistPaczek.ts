@@ -161,7 +161,7 @@ export function zarejestrujEksportEtykiet(id: string, etykiety: { paczkaId: stri
     historia.push({
       id: utworzId('audyt'), paczkaId: etykieta.paczkaId, typ: 'WYDRUK', data: new Date().toISOString(), uzytkownikId: konto.id,
       opis: `${czyPotwierdzony ? 'Potwierdzono wydruk' : 'Wygenerowano PDF'} etykiety v${wersja}: ${etykieta.nazwaPaczki}.`,
-      wydrukEtykiety: { odcisk: etykieta.odcisk, wersja, format, tryb, czyProbaQr, czyPotwierdzony },
+      wydrukEtykiety: { odcisk: etykieta.odcisk, wersja, format, tryb, czyProbaQr, czyPotwierdzony, rodzaj: etykieta.ustawienia.rodzaj },
     })
   }
   return repozytoriumWspolnychDokumentow.aktualizuj(id, { daneDokumentu: { ...dokument.daneDokumentu, historia } })
@@ -282,7 +282,7 @@ export async function dodajZdjeciePaczki(id: string, paczkaId: string, plik: Fil
 }
 
 function odciskTresci(dane: DaneChecklistyPaczki) {
-  return JSON.stringify({ ...dane, identyfikator: undefined, historia: undefined, wersjeWydruku: undefined, zalaczniki: undefined, prosbyOWeryfikacje: undefined, korektyEtykiet: undefined })
+  return JSON.stringify({ ...dane, identyfikator: undefined, historia: undefined, wersjeWydruku: undefined, zalaczniki: undefined, prosbyOWeryfikacje: undefined, korektyEtykiet: undefined, ustawieniaEtykiety: undefined })
 }
 
 export function zarejestrujWydrukChecklisty(id: string, uzytkownikId: string | null, rodzaj: 'wydruk' | 'pdf' = 'wydruk') {

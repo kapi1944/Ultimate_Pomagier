@@ -1,4 +1,5 @@
 import { WERSJA_SCHEMATU_SWOBODNYCH_BLOKOW, normalizujBlokiSwobodneDokumentu, type BlokSwobodnyDokumentu } from '../../../../wspolne/dokumenty/modelSwobodnychBlokow'
+import { normalizujUstawieniaEtykiety, type UstawieniaEtykiety } from './ustawieniaEtykietyPaczki'
 import type { DyspozycjeMaterialowe, DyspozycjaMaterialowa, RodzajDyspozycjiMaterialowej } from '../../../zamkniete/szczegoly_organizacyjne/typy'
 
 export type StatusGotowosciPozycji = 'NIEGOTOWE' | 'W_TOKU_LUB_PROBLEM' | 'CZESCIOWO_GOTOWE' | 'GOTOWE'
@@ -85,6 +86,8 @@ export type PaczkaChecklisty = {
 }
 
 export type SzablonChecklistyPaczki = {
+  przeznaczenie?: 'etykieta'
+  ustawieniaEtykiety?: UstawieniaEtykiety
   id: string
   nazwa: string
   utworzono: string
@@ -172,7 +175,7 @@ export type WpisAudytuChecklisty = {
   zmianyDyspozycji?: PorownanieDyspozycjiChecklisty[]
   zrodloDyspozycji?: Pick<MigawkaZrodlaChecklisty, 'szczegolyOrganizacyjneId' | 'grupaId' | 'odciskDanych' | 'dyspozycjeMaterialowe' | 'zrodloImportuMaila'>
   potwierdzeniePaczki?: { zdjecieId: string; odcisk: string }
-  wydrukEtykiety?: { odcisk: string; wersja: number; format: string; tryb: 'termiczny' | 'kolorowy'; czyProbaQr: boolean; czyPotwierdzony?: boolean }
+  wydrukEtykiety?: { odcisk: string; wersja: number; format: string; tryb: 'termiczny' | 'kolorowy'; czyProbaQr: boolean; czyPotwierdzony?: boolean; rodzaj?: 'szkoleniowa' | 'uniwersalna' }
 }
 
 export type ProsbaOWeryfikacje = {
@@ -230,7 +233,8 @@ export type DaneChecklistyPaczki = {
   osobaPakujaca: string
   wersjeWydruku: WersjaWydrukuChecklisty[]
   zalaczniki: ZalacznikChecklisty[]
-  korektyEtykiet?: Record<string, { kod?: string; uwagi?: string; pozycje?: Record<string, { nazwa?: string; ilosc?: number }> }>
+  ustawieniaEtykiety?: UstawieniaEtykiety
+  korektyEtykiet?: Record<string, { kod?: string; uwagi?: string; pozycje?: Record<string, { nazwa?: string; ilosc?: number; czyUkryta?: boolean }> }>
   historia: WpisAudytuChecklisty[]
   prosbyOWeryfikacje: ProsbaOWeryfikacje[]
   blokiSwobodne: BlokSwobodnyDokumentu[]
@@ -294,7 +298,7 @@ export function utworzNowaPozycjeChecklisty(kategoriaId: string, nazwa: string, 
   }
 }
 
-function utworzPozycjeDomyslne(kategorie: KategoriaChecklisty[], wariantOnline: boolean): PozycjaChecklisty[] {
+export function utworzPozycjeDomyslne(kategorie: KategoriaChecklisty[], wariantOnline: boolean): PozycjaChecklisty[] {
   const kategoria = (nazwa: string) => kategorie.find((pozycja) => pozycja.nazwa === nazwa)?.id ?? kategorie[0].id
   const utworz = (nazwa: string, nazwaKategorii: string, regulaIlosci: RegulaIlosci, kolejnosc: number, opcje: Partial<PozycjaChecklisty> = {}): PozycjaChecklisty => ({
     id: utworzId('pozycja'),
@@ -518,6 +522,7 @@ export function normalizujDaneChecklisty(dane: DaneChecklistyPaczki): DaneCheckl
     wersjeWydruku: dane.wersjeWydruku ?? [],
     zalaczniki: dane.zalaczniki ?? [],
     prosbyOWeryfikacje: dane.prosbyOWeryfikacje ?? [],
+    ustawieniaEtykiety: normalizujUstawieniaEtykiety(dane.ustawieniaEtykiety),
     daneOdbiorcy: { ...odbiorcaDomyslny(), ...dane.daneOdbiorcy },
     dataWyslania: dane.dataWyslania ?? '',
     osobaPakujaca: dane.osobaPakujaca ?? '',

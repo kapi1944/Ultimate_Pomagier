@@ -715,7 +715,8 @@
       "zadanie": "V4-15",
       "powierzchnie": [
         "details",
-        "details className=\"etykiety-paczek__korekta\" key={etykieta.paczkaId} open"
+        "details className=\"etykiety-paczek__korekta\" key={etykieta.paczkaId} open",
+        "details className=\"etykiety-paczek__opcje\""
       ],
       "ukonczoneEtapy": [],
       "wspoldzieloneZ": []

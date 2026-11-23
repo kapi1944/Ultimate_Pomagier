@@ -1,8 +1,9 @@
 import type { SzablonChecklistyPaczki } from './modelChecklistyPaczki'
+import { normalizujUstawieniaEtykiety } from './ustawieniaEtykietyPaczki'
 
 const kluczMagazynu = 'ultimate-pomagier.checklisty-paczek.szablony'
 
-export function pobierzSzablonyChecklistPaczek(): SzablonChecklistyPaczki[] {
+function pobierzWszystkieSzablony(): SzablonChecklistyPaczki[] {
   if (typeof localStorage === 'undefined') return []
   try {
     const zapis = localStorage.getItem(kluczMagazynu)
@@ -13,9 +14,18 @@ export function pobierzSzablonyChecklistPaczek(): SzablonChecklistyPaczki[] {
   }
 }
 
+export function pobierzSzablonyChecklistPaczek() {
+  return pobierzWszystkieSzablony().filter((szablon) => szablon.przeznaczenie !== 'etykieta')
+}
+
+export function pobierzSzablonyEtykietPaczek() {
+  return pobierzWszystkieSzablony().filter((szablon) => szablon.przeznaczenie === 'etykieta')
+    .map((szablon) => ({ ...szablon, ustawieniaEtykiety: normalizujUstawieniaEtykiety(szablon.ustawieniaEtykiety) }))
+}
+
 export function zapiszNowySzablonChecklisty(szablon: SzablonChecklistyPaczki) {
   if (typeof localStorage === 'undefined') return null
-  const szablony = pobierzSzablonyChecklistPaczek()
+  const szablony = pobierzWszystkieSzablony()
   const nazwy = new Set(szablony.map((pozycja) => pozycja.nazwa.toLocaleLowerCase('pl')))
   const nazwa = szablon.nazwa.trim()
   if (!nazwa || nazwy.has(nazwa.toLocaleLowerCase('pl'))) return null
