@@ -1,9 +1,7 @@
 import { czyWidokZakupow, trasyZakupow, pobierzSciezkeZakupow, pobierzWidokZakupowZeSciezki } from '../nawigacja/konfiguracjaZakupow'
-import WidokZakupow from '../../moduly/zakupy/WidokZakupow'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import WidokUstawien from '../ustawienia/WidokUstawien'
 import {
   pobierzUstawieniaAplikacji,
   zastosujUstawieniaAplikacji,
@@ -16,37 +14,25 @@ import type { WidokNawigacji } from '../nawigacja/typyNawigacji'
 import { konfiguracjePodmenuGeneratorow, pobierzSciezkeGeneratora, pobierzWidokGeneratoraZeSciezki } from '../nawigacja/konfiguracjaGeneratorow'
 import GranicaBleduGeneratora from '../../moduly/dokumenty/wspolne/GranicaBleduGeneratora'
 import { pobierzSciezkeNarzedzia, pobierzWidokNarzedziaZeSciezki } from '../nawigacja/konfiguracjaNarzedzi'
-import WidokNarzedzi from '../../moduly/narzedzia/WidokNarzedzi'
-import WidokPoprawiaczaPrezentacji from '../../moduly/narzedzia/poprawiacz_prezentacji/WidokPoprawiaczaPrezentacji'
-import WidokKartotek, { type ZakladkaKartotek } from '../../kartoteki/WidokKartotek'
-import WidokProfiluUzytkownika from '../../kartoteki/uzytkownicy/WidokProfiluUzytkownika'
-import WidokKopiiRoboczychDokumentow from '../../moduly/dokumenty/WidokKopiiRoboczychDokumentow'
-import WidokUzytkownikow from '../../kartoteki/uzytkownicy/WidokUzytkownikow'
-import WidokWszystkichDokumentow from '../../moduly/dokumenty/WidokWszystkichDokumentow'
+import type { ZakladkaKartotek } from '../../kartoteki/WidokKartotek'
 import type { TypSzybkiegoDokumentu } from '../../moduly/dokumenty/ListaDokumentow'
-import WidokAnkiet from '../../moduly/dokumenty/generatory/ankiety/WidokAnkiet'
-import WidokDyplomow from '../../moduly/dokumenty/generatory/dyplomy/WidokDyplomow'
-import WidokKartNaDrzwi from '../../moduly/dokumenty/generatory/karta_na_drzwi/WidokKartNaDrzwi'
-import WidokChecklistPaczek from '../../moduly/dokumenty/generatory/checklisty_paczek/WidokChecklistPaczek'
 import { pobierzChecklistePaczki } from '../../moduly/dokumenty/generatory/checklisty_paczek/rejestrChecklistPaczek'
-import WidokListyObecnosciZDokumentu from '../../moduly/dokumenty/generatory/listy_obecnosci/WidokListyObecnosciZDokumentu'
-import { WidokProgramowSzkolen } from '../../moduly/dokumenty/generatory/programy_szkolen'
 import {
   wyczyscAktywnaKopieProgramu,
   ustawAktywnaKopieProgramu,
 } from '../../moduly/dokumenty/generatory/programy_szkolen/magazynKopiiRoboczychProgramu'
 import { czyDokumentMaNiezapisaneZmiany, czyTrwaZapisDokumentu, odrzucZmianyDokumentu, zapiszDokumentPrzedWyjsciem } from '../../moduly/dokumenty/wspolne/strzeznikNiezapisanegoDokumentu'
-import WidokReplikatoraDokumentow from '../../moduly/dokumenty/replikator_dokumentow/WidokReplikatoraDokumentow'
-import WidokSzkolenOtwartych from '../../moduly/otwarte/WidokSzkolenOtwartych'
 import WidokPulpitu from '../../moduly/zamkniete/pulpit/WidokPulpitu'
-import WidokKopiiRoboczychSzczegolowOrganizacyjnych from '../../moduly/zamkniete/szczegoly_organizacyjne/widoki/WidokKopiiRoboczychSzczegolowOrganizacyjnych'
-import WidokListySzczegolowOrganizacyjnych from '../../moduly/zamkniete/szczegoly_organizacyjne/widoki/WidokListySzczegolowOrganizacyjnych'
-import WidokNowychSzczegolowOrganizacyjnych from '../../moduly/zamkniete/szczegoly_organizacyjne/widoki/WidokNowychSzczegolowOrganizacyjnych'
 import { pobierzAktualnaWersjeRobocza, pobierzIdInstancjiSzczegolow, pobierzKopieRobocze, rozpocznijNoweSzczegolyOrganizacyjne, ustawAktualnaWersjeRobocza, ustawIdInstancjiSzczegolow, utworzNowaInstancjeSzczegolow, wyczyscAktualnaWersjeRobocza } from '../../moduly/zamkniete/szczegoly_organizacyjne/uslugi/magazynWersjiRoboczych'
-import WidokGeneratoraSzczegolow from '../../moduly/zamkniete/szkolenia/generator_szczegolow/WidokGeneratoraSzczegolow'
-import WidokSzkolenZamknietych from '../../moduly/zamkniete/szkolenia/WidokSzkolenZamknietych'
 import { pobierzSciezkeGeneratoraDokumentu } from '../../wspolne/dokumenty/konfiguracjaDokumentow'
 import type { Dokument } from '../../wspolne/dokumenty/modelDokumentu'
+import {
+  WidokAnkiet, WidokChecklistPaczek, WidokDyplomow, WidokGeneratoraSzczegolow, WidokKartNaDrzwi, WidokKartotek,
+  WidokKopiiRoboczychDokumentow, WidokKopiiRoboczychSzczegolowOrganizacyjnych, WidokListyObecnosciZDokumentu,
+  WidokListySzczegolowOrganizacyjnych, WidokNarzedzi, WidokNowychSzczegolowOrganizacyjnych, WidokPoprawiaczaPrezentacji,
+  WidokProfiluUzytkownika, WidokProgramowSzkolen, WidokReplikatoraDokumentow, WidokSzkolenOtwartych, WidokSzkolenZamknietych,
+  WidokUstawien, WidokUzytkownikow, WidokWszystkichDokumentow, WidokZakupow, wczytajWidokiWTle,
+} from './leniweWidoki'
 import './ukladAplikacji.css'
 import './powlokaV4.css'
 import DockAplikacji from './DockAplikacji'
@@ -764,8 +750,10 @@ export default function UkladAplikacji() {
     }
   }, [poprosODecyzjePrzedNawigacja])
 
+  useEffect(() => wczytajWidokiWTle(), [])
+
   const nazwaGeneratora = konfiguracjePodmenuGeneratorow.find((konfiguracja) => konfiguracja.pozycje[0]?.widok === aktywnyWidok)?.etykieta
-  const widok = <WidokAplikacji widok={aktywnyWidok} zmienZakladkeKartotek={zmienZakladkeKartotek} ustawAktywnyWidok={ustawWidok} wersjaProgramu={wersjaProgramu} wersjaFormularzaSzczegolow={wersjaFormularzaSzczegolow} otworzDokument={otworzDokument} uzytkownikIdProfilu={uzytkownikIdProfilu} wybierzProfil={otworzProfil} otworzRekordPulpitu={() => ustawWidok('zamkniete_szczegoly_organizacyjne_lista')} otworzDokumentyPulpitu={() => ustawWidok('dokumenty_wszystkie')} otworzPaczkePulpitu={() => ustawWidok('checklisty_paczek')} />
+  const widok = <Suspense fallback={<p className="uklad-aplikacji__wczytywanie-widoku" role="status">Wczytywanie widoku…</p>}><WidokAplikacji widok={aktywnyWidok} zmienZakladkeKartotek={zmienZakladkeKartotek} ustawAktywnyWidok={ustawWidok} wersjaProgramu={wersjaProgramu} wersjaFormularzaSzczegolow={wersjaFormularzaSzczegolow} otworzDokument={otworzDokument} uzytkownikIdProfilu={uzytkownikIdProfilu} wybierzProfil={otworzProfil} otworzRekordPulpitu={() => ustawWidok('zamkniete_szczegoly_organizacyjne_lista')} otworzDokumentyPulpitu={() => ustawWidok('dokumenty_wszystkie')} otworzPaczkePulpitu={() => ustawWidok('checklisty_paczek')} /></Suspense>
   return (
     <div ref={powloka} className={`uklad-aplikacji${stanMenu.czyPrzypiete && stanMenu.czyOtwarte ? ' uklad-aplikacji--menu-przypiete' : ''}`}>
       <a className="powloka__pomin" href="#obszar-roboczy">Przejdź do treści</a>
