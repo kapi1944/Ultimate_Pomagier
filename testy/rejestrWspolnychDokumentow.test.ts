@@ -131,3 +131,26 @@ test('rozroznia zrodlo, reczne nadpisanie i nowsze dane Szczegolow bez kolizji i
   assert.equal(pobierzStanWartosciDokumentu(true, false), 'RECZNIE_NADPISANA')
   assert.equal(pobierzStanWartosciDokumentu(false, true), 'NIEAKTUALNA_WZGLEM_ZRODLA')
 })
+
+test('pamięć podręczna odczytu: powtórny odczyt nie parsuje zapisu, a zmiana zapisu (także z innego okna) ją unieważnia', () => {
+  magazyn.clear()
+  repozytoriumWspolnychDokumentow.utworz(utworzDokument('cache-1'))
+  const pierwszy = repozytoriumWspolnychDokumentow.pobierzPoId('cache-1')
+  assert.ok(pierwszy)
+  assert.equal(repozytoriumWspolnychDokumentow.pobierzPoId('cache-1'), pierwszy, 'ten sam zapis zwraca ten sam rekord bez ponownego parsowania')
+
+  // Modyfikacja tablicy zwróconej przez pobierzWszystkie nie może uszkodzić pamięci podręcznej.
+  repozytoriumWspolnychDokumentow.pobierzWszystkie().pop()
+  assert.equal(repozytoriumWspolnychDokumentow.pobierzWszystkie().length, 1)
+
+  const aktualizacja = repozytoriumWspolnychDokumentow.aktualizuj('cache-1', { tytul: 'Zmieniony' })
+  assert.equal(repozytoriumWspolnychDokumentow.pobierzPoId('cache-1')?.tytul, 'Zmieniony')
+  assert.notEqual(repozytoriumWspolnychDokumentow.pobierzPoId('cache-1'), pierwszy)
+  assert.equal(aktualizacja?.tytul, 'Zmieniony')
+
+  // Zmiana zapisu poza tym oknem (zdarzenie storage) musi być widoczna bez ręcznego odświeżania.
+  const zapis = JSON.parse(magazyn.get(kluczRejestruDokumentow) as string)
+  zapis.dokumenty[0].tytul = 'Z innego okna'
+  magazyn.set(kluczRejestruDokumentow, JSON.stringify(zapis))
+  assert.equal(repozytoriumWspolnychDokumentow.pobierzPoId('cache-1')?.tytul, 'Z innego okna')
+})

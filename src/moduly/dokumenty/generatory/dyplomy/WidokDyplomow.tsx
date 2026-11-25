@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ChangeEvent } from 'react'
-import { pobierzLokalizacjeZMagazynu } from '../../../../kartoteki/lokalizacje/magazynLokalizacji'
+import { pobierzNazwyMiejscowosci } from '../../../../kartoteki/lokalizacje/magazynLokalizacji'
 import type { TrybTytuluDyplomu } from '../../../../wspolne/dokumenty/typyDokumentu'
 import AkcjeEksportuPdf from '../../../../wspolne/dokumenty/AkcjeEksportuPdf'
 import { zapiszDokumentRoboczyGeneratora } from '../../../../wspolne/dokumenty/zapisDokumentuGeneratora'
@@ -1066,13 +1066,7 @@ export default function WidokDyplomow() {
     { etykieta: 'Miejsce szkolenia', uzupelnione: dane.trybSzkolenia === 'online' || Boolean(dane.miejsceSzkolenia.trim()) },
     { etykieta: 'Numery rejestru uczestników', uzupelnione: uczestnicyDoDruku.length > 0 && uczestnicyDoDruku.every((uczestnik) => uczestnik.numerRejestru.trim()) },
   ]
-  const miejscowosciDoPodpowiedzi = useMemo(
-    () =>
-      [...new Set(pobierzLokalizacjeZMagazynu().map((lokalizacja) => lokalizacja.nazwa))].sort((pierwsza, druga) =>
-        pierwsza.localeCompare(druga, 'pl'),
-      ),
-    [],
-  )
+  const miejscowosciDoPodpowiedzi = useMemo(() => pobierzNazwyMiejscowosci(), [])
   const podpowiedziMiejscaSzkolenia = useMemo(
     () => wybierzPodpowiedziMiejscowosci(miejscowosciDoPodpowiedzi, dane.miejsceSzkolenia),
     [dane.miejsceSzkolenia, miejscowosciDoPodpowiedzi],

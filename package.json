@@ -4,7 +4,7 @@
   "version": "4.1.1",
   "type": "module",
   "scripts": {
-    "pretest": "node --import ./testy/rejestrujLoaderTs.mjs testy/zapisRejestruPrzyBrakuMiejsca.test.ts && node --import ./testy/rejestrujLoaderTs.mjs testy/swobodneBlokiDokumentu.test.ts && node --import ./testy/rejestrujLoaderTs.mjs testy/wspolnyStandardGeneratorow.test.ts && node --import ./testy/rejestrujLoaderTs.mjs testy/generatoryOperacyjne.test.ts && node --import ./testy/rejestrujLoaderTs.mjs --test testy/indeksLokalizacjiSzczegolow.test.ts && npm run test:bezpieczenstwo && npm run test:pakiety-pdf",
+    "pretest": "node --import ./testy/rejestrujLoaderTs.mjs testy/zapisRejestruPrzyBrakuMiejsca.test.ts && node --import ./testy/rejestrujLoaderTs.mjs testy/swobodneBlokiDokumentu.test.ts && node --import ./testy/rejestrujLoaderTs.mjs testy/wspolnyStandardGeneratorow.test.ts && node --import ./testy/rejestrujLoaderTs.mjs testy/generatoryOperacyjne.test.ts && node --import ./testy/rejestrujLoaderTs.mjs --test testy/indeksLokalizacjiSzczegolow.test.ts && node --import ./testy/rejestrujLoaderTs.mjs --test testy/autosaveSzczegolowOdroczony.test.ts && npm run test:bezpieczenstwo && npm run test:pakiety-pdf",
     "dev": "vite",
     "test:bezpieczenstwo": "node --test testy/izolacjaTrybuDemo.test.mjs testy/bezpieczenstwoZaleznosci.test.mjs",
     "test:szczegoly:przegladarka": "node --test testy/wydajnoscSzczegolow.przegladarka.test.mjs",

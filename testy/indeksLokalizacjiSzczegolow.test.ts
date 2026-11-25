@@ -62,3 +62,16 @@ test('migawka wykrywa zmianę odmiany, nazw, kolejności i usunięcie lokalizacj
   lokalizacje[0].nazwa = 'Inna miejscowość'
   assert.equal(odswiezony.czyAktualny(lokalizacje), false)
 })
+
+test('wspólny indeks jest budowany raz dla tej samej listy i odświeżany tylko przy zmianie danych', async () => {
+  const { pobierzWspolnyIndeksLokalizacji, odswiezIndeksLokalizacji } = await import('../src/moduly/zamkniete/szczegoly_organizacyjne/uslugi/indeksLokalizacjiSzczegolow.ts')
+  const lista = [lokalizacja('Łódź'), lokalizacja('Mielec')]
+  const indeks = pobierzWspolnyIndeksLokalizacji(lista)
+  assert.equal(pobierzWspolnyIndeksLokalizacji(lista), indeks)
+  assert.equal(odswiezIndeksLokalizacji(indeks, lista), indeks)
+  assert.equal(odswiezIndeksLokalizacji(indeks, structuredClone(lista)), indeks, 'równa treść nie przebudowuje indeksu')
+  const zmieniona = [{ ...lista[0], status_odmiany: true, miejscownik_pelny_auto: 'Łodzi' }, lista[1]]
+  const nowy = odswiezIndeksLokalizacji(indeks, zmieniona)
+  assert.notEqual(nowy, indeks)
+  assert.equal(nowy.znajdz('Łódź')?.miejscownik_pelny_auto, 'Łodzi')
+})

@@ -2,7 +2,7 @@ import { KontekstZatwierdzania } from '../komponenty/zatwierdzaniePol'
 import { RegulacjaSzerokosci } from '../../../../wspolne/komponenty/RegulacjaSzerokosci'
 import { zdarzenieZmianySkaliInterfejsu } from '../../../../aplikacja/ustawienia/skalaInterfejsu'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { pobierzLokalizacjeZMagazynu } from '../../../../kartoteki/lokalizacje/magazynLokalizacji'
+import { pobierzNazwyMiejscowosci } from '../../../../kartoteki/lokalizacje/magazynLokalizacji'
 import type { Dokument } from '../../../../wspolne/dokumenty/modelDokumentu'
 import { utworzDokumentZeSzczegolow } from '../../../../wspolne/integracje/szczegolyDoDokumentow'
 import KartaGrupySzkoleniowej from '../komponenty/KartaGrupySzkoleniowej'
@@ -307,10 +307,7 @@ export default function WidokNowychSzczegolowOrganizacyjnych({ otworzDokument }:
   const stanKompletnosci = generator.czyFormularzKompletny ? 'Kompletny' : `Niekompletny (${liczbaProblemowBlokujacych})`
   const statusFormularza = !generator.aktywnaKopiaId && !generator.czyNiezapisaneZmiany ? stanZapisu : `${stanZapisu} | ${stanKompletnosci}`
   const kompletneSekcjeNawigacji = useMemo(() => pobierzIdKompletnychSekcji(generator.modelSekcyjny), [generator.modelSekcyjny])
-  const miejscowosciDoPodpowiedzi = useMemo(
-    () => [...new Set(pobierzLokalizacjeZMagazynu().map((lokalizacja) => lokalizacja.nazwa))].sort((pierwsza, druga) => pierwsza.localeCompare(druga, 'pl')),
-    [],
-  )
+  const miejscowosciDoPodpowiedzi = useMemo(() => pobierzNazwyMiejscowosci(), [])
   const podpowiedziMiastaPaczki = useMemo(() => wybierzPodpowiedziMiejscowosci(miejscowosciDoPodpowiedzi, generator.daneFormularza.odbiorcaPaczki.miasto), [miejscowosciDoPodpowiedzi, generator.daneFormularza.odbiorcaPaczki.miasto])
   const liczbaUkrytychWpisowHistorii = pobierzLiczbeUkrytychWpisowHistorii(generator.historiaSzczegolow)
   const widoczneWpisyHistorii = pobierzWidoczneWpisyHistorii(generator.historiaSzczegolow, czyHistoriaRozwinieta)

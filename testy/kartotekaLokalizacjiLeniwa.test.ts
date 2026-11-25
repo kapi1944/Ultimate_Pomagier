@@ -97,3 +97,17 @@ test('błąd odczytu localStorage nie przerywa pracy kartoteki', () => {
     globalThis.localStorage.getItem = oryginal
   }
 })
+
+test('bez zmian użytkownika scalona lista to współdzielona lista startowa, a nazwy miejscowości są liczone raz', () => {
+  magazyn.clear()
+  const startowa = kartoteka.pobierzLokalizacjeStartowe()
+  assert.equal(kartoteka.pobierzLokalizacjeZMagazynu(), startowa, 'brak kopii 70 tys. rekordów')
+  const nazwy = kartoteka.pobierzNazwyMiejscowosci()
+  assert.equal(kartoteka.pobierzNazwyMiejscowosci(), nazwy)
+  assert.deepEqual(nazwy, [...nazwy].sort((a, b) => a.localeCompare(b, 'pl')), 'kolejność jak przy localeCompare("pl")')
+  assert.equal(new Set(nazwy).size, nazwy.length)
+  magazyn.set(kluczLokalizacji, JSON.stringify([{ klucz_lokalizacji: 'wlasna_2', nazwa: 'Aaa Własna', miejscownik_pelny_auto: 'Aaa Własnej', status_odmiany: true }]))
+  const poZmianie = kartoteka.pobierzNazwyMiejscowosci()
+  assert.notEqual(poZmianie, nazwy)
+  assert.ok(poZmianie.includes('Aaa Własna'))
+})
