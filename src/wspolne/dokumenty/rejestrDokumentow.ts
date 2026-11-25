@@ -114,23 +114,36 @@ function zapiszStan(stan: StanRejestruDokumentow) {
   }
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(zdarzenieZmianyRejestruDokumentow))
 }
-export function pobierzStanRejestruDokumentowBezZapisu(): StanRejestruDokumentow {
-  const zapis = localStorage.getItem(kluczRejestruDokumentow)
-  if (zapis === null) return pustyStan()
+function wczytajStanZZapisu(zapis: string): { stan: StanRejestruDokumentow; wersjaZapisu: number } {
   let odczyt: unknown
   try { odczyt = odczytajZapisRejestru(zapis) } catch { throw new Error('Rejestr dokumentów zawiera uszkodzony JSON lub skompresowany zapis.') }
   if (!czyObiekt(odczyt)) throw new Error('Rejestr dokumentów ma nieobsługiwany schemat.')
   const wersja = typeof odczyt.wersja === 'number' ? odczyt.wersja : 0
   if (wersja > wersjaRejestruDokumentow) throw new Error('Rejestr dokumentów ma nowszą, nieobsługiwaną wersję.')
-  return przeksztalcDoV3(odczyt)
+  return { stan: przeksztalcDoV3(odczyt), wersjaZapisu: wersja }
 }
+export function pobierzStanRejestruDokumentowBezZapisu(): StanRejestruDokumentow {
+  const zapis = localStorage.getItem(kluczRejestruDokumentow)
+  if (zapis === null) return pustyStan()
+  return wczytajStanZZapisu(zapis).stan
+}
+// Jedno parsowanie na odczyt (wcześniej zapis był parsowany dwa razy). Zwrócony stan jest świeży i wolno go modyfikować przed zapisem.
 export function pobierzStanRejestruDokumentow(): StanRejestruDokumentow {
   const zapis = localStorage.getItem(kluczRejestruDokumentow)
-  const stan = pobierzStanRejestruDokumentowBezZapisu()
-  if (zapis === null) return stan
-  const odczyt = odczytajZapisRejestru(zapis) as Record<string, unknown>
-  const wersja = typeof odczyt.wersja === 'number' ? odczyt.wersja : 0
-  if (wersja < wersjaRejestruDokumentow) { localStorage.setItem(kluczKopiiBezpieczenstwaRejestruDokumentow, zapis); zapiszStan(stan) }
+  if (zapis === null) return pustyStan()
+  const { stan, wersjaZapisu } = wczytajStanZZapisu(zapis)
+  if (wersjaZapisu < wersjaRejestruDokumentow) { localStorage.setItem(kluczKopiiBezpieczenstwaRejestruDokumentow, zapis); zapiszStan(stan) }
+  return stan
+}
+
+// Pamięć podręczna wyłącznie dla odczytów. Klucz to surowy zapis z localStorage, więc każda zmiana (także z innego okna) ją unieważnia.
+// Zwrócone rekordy są współdzielone i traktowane jako niemodyfikowalne; operacje zapisu zawsze czytają świeży stan.
+let pamiecStanuOdczytu: { zapis: string | null; stan: StanRejestruDokumentow } | null = null
+function pobierzStanDoOdczytu(): StanRejestruDokumentow {
+  const zapis = localStorage.getItem(kluczRejestruDokumentow)
+  if (pamiecStanuOdczytu && pamiecStanuOdczytu.zapis === zapis) return pamiecStanuOdczytu.stan
+  const stan = pobierzStanRejestruDokumentow()
+  pamiecStanuOdczytu = { zapis: localStorage.getItem(kluczRejestruDokumentow), stan }
   return stan
 }
 export function zapiszStanRejestruDokumentow(stan: StanRejestruDokumentow) { zapiszStan(stan) }
@@ -205,8 +218,8 @@ export async function zatwierdzGotowoscPaczki(dokumentId: string, paczkaId: stri
 }
 
 export const repozytoriumWspolnychDokumentow: RepozytoriumWspolnychDokumentow = {
-  pobierzWszystkie: () => [...pobierzStanRejestruDokumentow().dokumenty].sort((pierwszy, drugi) => Date.parse(drugi.zmodyfikowano) - Date.parse(pierwszy.zmodyfikowano)),
-  pobierzPoId: (id) => pobierzStanRejestruDokumentow().dokumenty.find((dokument) => dokument.id === id) ?? null,
+  pobierzWszystkie: () => [...pobierzStanDoOdczytu().dokumenty].sort((pierwszy, drugi) => Date.parse(drugi.zmodyfikowano) - Date.parse(pierwszy.zmodyfikowano)),
+  pobierzPoId: (id) => pobierzStanDoOdczytu().dokumenty.find((dokument) => dokument.id === id) ?? null,
   utworz<TDane, TUstawienia>(dokument: Dokument<TDane, TUstawienia>) {
     const stan = pobierzStanRejestruDokumentow()
     const rekord: Dokument<unknown, unknown> = dokument
@@ -228,14 +241,14 @@ export const repozytoriumWspolnychDokumentow: RepozytoriumWspolnychDokumentow = 
   przywrocZKosza(id) { const teraz = new Date().toISOString(); return aktualizujStan(id, (dokument) => ({ ...dokument, czyUsunietyMiekko: false, usunieto: null, zmodyfikowano: teraz, zaktualizowano: teraz }), 'przywrocenie_z_kosza') },
   usunTrwale(id) { const stan = pobierzStanRejestruDokumentow(); const dokument = stan.dokumenty.find((pozycja) => pozycja.id === id); if (!dokument?.czyUsunietyMiekko) return false; stan.dokumenty = stan.dokumenty.filter((pozycja) => pozycja.id !== id); dodajHistorie(stan, dokument, 'usuniecie_trwale', { dokument }); zapiszStan(stan); return true },
   utworzKopieRobocza(dane) { const stan = pobierzStanRejestruDokumentow(); const teraz = new Date().toISOString(); const zajeteId = new Set([...stan.dokumenty.map((dokument) => dokument.id), ...stan.kopieRobocze.map((kopia) => kopia.id)]); const id = dane.id && !zajeteId.has(dane.id) ? dane.id : utworzId('kopia'); const kopia: KopiaRoboczaDokumentu = { ...dane, id, utworzono: teraz, zaktualizowano: teraz }; stan.kopieRobocze.unshift(kopia); zapiszStan(stan); return kopia },
-  pobierzKopieRobocza: (id) => pobierzStanRejestruDokumentow().kopieRobocze.find((kopia) => kopia.id === id) ?? null,
+  pobierzKopieRobocza: (id) => pobierzStanDoOdczytu().kopieRobocze.find((kopia) => kopia.id === id) ?? null,
   aktualizujKopieRobocza(id, zmiany) { const stan = pobierzStanRejestruDokumentow(); const indeks = stan.kopieRobocze.findIndex((kopia) => kopia.id === id); if (indeks === -1) return null; const kopia = { ...stan.kopieRobocze[indeks], ...zmiany, id, zaktualizowano: new Date().toISOString() }; stan.kopieRobocze[indeks] = kopia; zapiszStan(stan); return kopia },
   usunKopieRobocza(id) { const stan = pobierzStanRejestruDokumentow(); const kopieRobocze = stan.kopieRobocze.filter((kopia) => kopia.id !== id); if (kopieRobocze.length === stan.kopieRobocze.length) return false; zapiszStan({ ...stan, kopieRobocze }); return true },
   odswiezDostepnoscDanychZrodlowych(id, aktualnyZnacznikDanychZrodlowych) { const teraz = new Date().toISOString(); return aktualizujStan(id, (dokument) => ({ ...dokument, integralnosc: { ...dokument.integralnosc, czyDaneZrodloweNowsze: czyDokumentMaNowszeDaneZrodlowe(dokument, aktualnyZnacznikDanychZrodlowych) }, zmodyfikowano: teraz, zaktualizowano: teraz }), 'odswiezenie_zrodla') },
-  pobierzHistorie: (dokumentId) => pobierzStanRejestruDokumentow().historia.filter((wpis) => !dokumentId || wpis.dokumentId === dokumentId).sort((pierwszy, drugi) => Date.parse(drugi.data) - Date.parse(pierwszy.data)),
+  pobierzHistorie: (dokumentId) => pobierzStanDoOdczytu().historia.filter((wpis) => !dokumentId || wpis.dokumentId === dokumentId).sort((pierwszy, drugi) => Date.parse(drugi.data) - Date.parse(pierwszy.data)),
   dodajWpisHistorii(wpis) { const stan = pobierzStanRejestruDokumentow(); const rekord: WpisHistoriiWspolnegoDokumentu = { ...wpis, id: wpis.id?.trim() || utworzId('historia'), data: wpis.data ?? new Date().toISOString() }; const istniejacy = stan.historia.find((pozycja) => pozycja.id === rekord.id); if (istniejacy) return istniejacy; stan.historia.unshift(rekord); zapiszStan(stan); return rekord },
-  pobierzAutosave: (id) => pobierzStanRejestruDokumentow().autosave.find((pozycja) => pozycja.id === id) ?? null,
-  pobierzNajnowszyAutosaveGeneratora: (generatorId) => pobierzStanRejestruDokumentow().autosave
+  pobierzAutosave: (id) => pobierzStanDoOdczytu().autosave.find((pozycja) => pozycja.id === id) ?? null,
+  pobierzNajnowszyAutosaveGeneratora: (generatorId) => pobierzStanDoOdczytu().autosave
     .filter((pozycja) => pozycja.generatorId === generatorId)
     .sort((pierwszy, drugi) => Date.parse(drugi.zapisano) - Date.parse(pierwszy.zapisano))[0] ?? null,
   zapiszAutosave(autosave) { const stan = pobierzStanRejestruDokumentow(); const rekord: AutosaveDokumentu = { ...autosave, zapisano: autosave.zapisano ?? new Date().toISOString() }; const indeks = stan.autosave.findIndex((pozycja) => pozycja.id === rekord.id); if (indeks === -1) stan.autosave.unshift(rekord); else stan.autosave[indeks] = rekord; zapiszStan(stan); return rekord },

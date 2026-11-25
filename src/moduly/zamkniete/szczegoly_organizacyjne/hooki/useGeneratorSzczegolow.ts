@@ -56,7 +56,8 @@ import {
   usunAutosaveSzczegolow,
   wersjaEksportuSzczegolow,
   wyczyscAktualnaWersjeRobocza,
-  zapiszAutosaveSzczegolow,
+  zapiszAutosaveSzczegolowOdroczony,
+  wykonajOczekujaceAutosaveSzczegolow,
   zapiszWersjeRobocza,
   zbudujWersjeRobocza,
 } from '../uslugi/magazynWersjiRoboczych'
@@ -64,7 +65,7 @@ import { parsujMailaSzczegolow } from '../uslugi/parserMailaSzczegolow'
 import { przygotujMapowanieImportuMaila } from '../uslugi/mapowanieImportuMaila'
 import { czyKontoMozeEdytowacSzczegoly } from '../uzytkownicySzczegolow'
 import { pobierzIdPola } from '../komponenty/identyfikatoryPol'
-import { zbudujIndeksLokalizacjiSzczegolow, type IndeksLokalizacjiSzczegolow } from '../uslugi/indeksLokalizacjiSzczegolow'
+import { odswiezIndeksLokalizacji, pobierzWspolnyIndeksLokalizacji, type IndeksLokalizacjiSzczegolow } from '../uslugi/indeksLokalizacjiSzczegolow'
 
 
 const etykietySekcji: Record<KluczSekcjiSzczegolow, string> = {
@@ -493,7 +494,7 @@ function zbudujProblemyWalidacjiDanych(dane: DaneFormularza): ProblemWalidacji[]
   return problemy
 }
 
-export function zbudujProblemyWalidacji(dane: DaneFormularza, grupy: GrupaSzkoleniowa[], indeksLokalizacji = zbudujIndeksLokalizacjiSzczegolow(pobierzLokalizacjeZMagazynu())): ProblemWalidacji[] {
+export function zbudujProblemyWalidacji(dane: DaneFormularza, grupy: GrupaSzkoleniowa[], indeksLokalizacji = pobierzWspolnyIndeksLokalizacji(pobierzLokalizacjeZMagazynu())): ProblemWalidacji[] {
   return [...zbudujProblemyWalidacjiDanych(dane), ...zbudujProblemyWalidacjiGrup(grupy, indeksLokalizacji)]
 }
 
@@ -680,7 +681,7 @@ export function useGeneratorSzczegolow() {
     ustawAutosaveDoDecyzji(null)
     ustawKomunikat('Odrzucono niezapisane zmiany.')
   }
-  const [indeksLokalizacji, ustawIndeksLokalizacji] = useState(() => zbudujIndeksLokalizacjiSzczegolow(pobierzLokalizacjeZMagazynu()))
+  const [indeksLokalizacji, ustawIndeksLokalizacji] = useState(() => pobierzWspolnyIndeksLokalizacji(pobierzLokalizacjeZMagazynu()))
   const problemyDanych = useMemo(() => zbudujProblemyWalidacjiDanych(daneFormularza), [daneFormularza])
   const walidujGrupe = useMemo(() => utworzWalidatorGrupy(indeksLokalizacji), [indeksLokalizacji])
   const problemyGrup = useMemo(() => grupy.length ? grupy.flatMap(walidujGrupe) : zbudujProblemyWalidacjiGrup(grupy, indeksLokalizacji), [grupy, walidujGrupe, indeksLokalizacji])
@@ -717,22 +718,30 @@ export function useGeneratorSzczegolow() {
       return
     }
 
-    try {
-      zapiszAutosaveSzczegolow({
-        id: `autosave-${Date.now()}`,
-        identyfikatorInstancji,
-        dataZapisu: new Date().toISOString(),
-        dane: daneFormularza,
-        grupy,
-        adresaci,
-        statusyPol,
-        aktywnaKopiaId,
-        zrodloOpublikowanegoId,
-      })
-    } catch {
-      queueMicrotask(() => ustawKomunikat('Nie udało się zapisać kopii odzyskiwania. Wprowadzone zmiany nadal są w formularzu.'))
-    }
+    zapiszAutosaveSzczegolowOdroczony({
+      id: `autosave-${Date.now()}`,
+      identyfikatorInstancji,
+      dataZapisu: new Date().toISOString(),
+      dane: daneFormularza,
+      grupy,
+      adresaci,
+      statusyPol,
+      aktywnaKopiaId,
+      zrodloOpublikowanegoId,
+    }, () => ustawKomunikat('Nie udało się zapisać kopii odzyskiwania. Wprowadzone zmiany nadal są w formularzu.'))
   }, [czyAutosaveAktywny, daneFormularza, grupy, adresaci, statusyPol, aktywnaKopiaId, zrodloOpublikowanegoId, identyfikatorInstancji])
+
+  useEffect(() => {
+    const zapiszOczekujace = () => { try { wykonajOczekujaceAutosaveSzczegolow() } catch { /* błąd zapisu jest zgłaszany z odroczonego zapisu; przy wyjściu nie ma gdzie go pokazać */ } }
+    const przyZmianieWidocznosci = () => { if (document.visibilityState === 'hidden') zapiszOczekujace() }
+    window.addEventListener('pagehide', zapiszOczekujace)
+    document.addEventListener('visibilitychange', przyZmianieWidocznosci)
+    return () => {
+      window.removeEventListener('pagehide', zapiszOczekujace)
+      document.removeEventListener('visibilitychange', przyZmianieWidocznosci)
+      zapiszOczekujace()
+    }
+  }, [])
 
   const oznaczPoleRecznie = useCallback(function oznaczPoleRecznie(pole: string) {
     ustawStatusyPol((obecne) => {
@@ -847,7 +856,7 @@ export function useGeneratorSzczegolow() {
 
   const odswiezLokalizacje = useCallback(() => {
     const lokalizacje = pobierzLokalizacjeZMagazynu()
-    ustawIndeksLokalizacji((obecny) => obecny.czyAktualny(lokalizacje) ? obecny : zbudujIndeksLokalizacjiSzczegolow(lokalizacje))
+    ustawIndeksLokalizacji((obecny) => odswiezIndeksLokalizacji(obecny, lokalizacje))
   }, [])
 
   useEffect(() => {
@@ -861,7 +870,7 @@ export function useGeneratorSzczegolow() {
 
   function sprawdzJakosc() {
     const aktualneLokalizacje = pobierzLokalizacjeZMagazynu()
-    const aktualnyIndeks = indeksLokalizacji.czyAktualny(aktualneLokalizacje) ? indeksLokalizacji : zbudujIndeksLokalizacjiSzczegolow(aktualneLokalizacje)
+    const aktualnyIndeks = odswiezIndeksLokalizacji(indeksLokalizacji, aktualneLokalizacje)
     const problemy = zbudujProblemyWalidacji(daneFormularza, grupy, aktualnyIndeks)
     const model = zbudujModelSekcyjny(daneFormularza, grupy, adresaci, efektywneStatusyPol, problemy)
     ustawIndeksLokalizacji(aktualnyIndeks)

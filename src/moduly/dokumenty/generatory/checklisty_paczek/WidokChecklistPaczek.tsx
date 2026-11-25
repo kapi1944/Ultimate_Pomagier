@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type RefObject, type ChangeEvent } from 'react'
-import { pobierzLokalizacjeZMagazynu } from '../../../../kartoteki/lokalizacje/magazynLokalizacji'
+import { pobierzNazwyMiejscowosci } from '../../../../kartoteki/lokalizacje/magazynLokalizacji'
 import { pobierzTrenerowZKartoteki } from '../../../../kartoteki/trenerzyKartoteki'
 import { useKontekstUzytkownika } from '../../../../aplikacja/logowanie/useKontekstUzytkownika'
 import AkcjeEksportuPdf from '../../../../wspolne/dokumenty/AkcjeEksportuPdf'
@@ -371,7 +371,7 @@ export default function WidokChecklistPaczek({ dokumentIdZTrasy, otworzDokument 
     const nowa = utworzRecznaChecklistePaczki(aktorId)
     otworz(nowa.id)
   }, [dokumentId, aktorId, celEtykiety])
-  const miejscowosci = useMemo(() => [...new Set(pobierzLokalizacjeZMagazynu().map((lokalizacja) => lokalizacja.nazwa))].sort((pierwsza, druga) => pierwsza.localeCompare(druga, 'pl')), [])
+  const miejscowosci = useMemo(() => pobierzNazwyMiejscowosci(), [])
   const trenerzy = useMemo(() => pobierzTrenerowZKartoteki(), [])
   if (celEtykiety && !czyJestPracownikiemWewnetrznym(zalogowanyUzytkownik)) return <section className="widok"><h1>Cel etykiety niedostępny</h1><p role="alert">Brak uprawnienia do otwarcia celu etykiety.</p></section>
   if (!dokument || dokument.czyUsunietyMiekko) return <section className="widok checklista-paczki"><h1>{celEtykiety ? 'Cel etykiety niedostępny' : 'Nowa checklista paczki'}</h1><p>{dokumentId || celEtykiety ? 'Nie znaleziono checklisty w tym profilu przeglądarki.' : 'Otwieranie formularza…'}</p></section>

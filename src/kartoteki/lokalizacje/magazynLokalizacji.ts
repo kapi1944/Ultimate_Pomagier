@@ -86,6 +86,11 @@ function odczytajLokalizacjeZMagazynu(zapis: string | null) {
 }
 
 function scalLokalizacje(seed: Lokalizacja[], zapisane: Lokalizacja[]) {
+  // Najczęstszy przypadek: użytkownik nie zmienił kartoteki. Zwracamy współdzieloną listę startową bez kopiowania 70 tys. rekordów.
+  if (zapisane.length === 0) {
+    return seed
+  }
+
   const mapa = new Map(seed.map((lokalizacja) => [lokalizacja.klucz_lokalizacji, lokalizacja]))
 
   zapisane.forEach((lokalizacja) => {
@@ -117,6 +122,20 @@ export function pobierzLokalizacjeZMagazynu() {
   const lokalizacje = scalLokalizacje(pobierzDaneStartowe().lokalizacje, odczytajLokalizacjeZMagazynu(zapis))
   pamiecScalonychLokalizacji = { zapis, lokalizacje }
   return lokalizacje
+}
+
+const kolatorPolski = new Intl.Collator('pl')
+let pamiecNazwMiejscowosci: { zrodlo: Lokalizacja[]; nazwy: string[] } | null = null
+
+/** Posortowane, unikalne nazwy miejscowości. Lista jest budowana raz dla danej wersji kartoteki i współdzielona przez widoki; nie wolno jej modyfikować. */
+export function pobierzNazwyMiejscowosci(lokalizacje: Lokalizacja[] = pobierzLokalizacjeZMagazynu()) {
+  if (pamiecNazwMiejscowosci && pamiecNazwMiejscowosci.zrodlo === lokalizacje) {
+    return pamiecNazwMiejscowosci.nazwy
+  }
+
+  const nazwy = [...new Set(lokalizacje.map((lokalizacja) => lokalizacja.nazwa))].sort(kolatorPolski.compare)
+  pamiecNazwMiejscowosci = { zrodlo: lokalizacje, nazwy }
+  return nazwy
 }
 
 export function zapiszLokalizacjeWMagazynie(lokalizacje: Lokalizacja[]) {

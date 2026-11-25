@@ -184,6 +184,9 @@ function pobierzKluczAutosave(identyfikatorInstancji: string) {
 }
 
 export function pobierzAutosaveSzczegolow(identyfikatorInstancji = pobierzIdInstancjiSzczegolow(), aktywnaKopiaId?: string | null) {
+  const oczekujacy = oczekujaceAutosave.get(identyfikatorInstancji)
+  if (oczekujacy) return { ...oczekujacy.autosave, identyfikatorInstancji }
+
   const autosaveInstancji = bezpiecznieParsuj<AutosaveSzczegolow | null>(localStorage.getItem(pobierzKluczAutosave(identyfikatorInstancji)), null)
   if (autosaveInstancji) return autosaveInstancji
 
@@ -201,7 +204,42 @@ export function zapiszAutosaveSzczegolow(autosave: AutosaveSzczegolow) {
   localStorage.setItem(kluczAutosave, JSON.stringify(zapis))
 }
 
+// Zapis przy każdym znaku serializował cały formularz i dwukrotnie pisał do localStorage. Zapis odroczony łączy serię zmian w jeden;
+// ostatnie dane są dopisywane przy wyjściu z widoku, ukryciu karty i zamknięciu okna (wykonajOczekujaceAutosaveSzczegolow).
+const opoznienieAutosaveSzczegolowMs = 700
+const oczekujaceAutosave = new Map<string, { autosave: AutosaveSzczegolow; czasomierz: ReturnType<typeof setTimeout>; przyBledzie?: (blad: unknown) => void }>()
+
+function wykonajOczekujacyAutosave(identyfikatorInstancji: string) {
+  const oczekujacy = oczekujaceAutosave.get(identyfikatorInstancji)
+  if (!oczekujacy) return
+  clearTimeout(oczekujacy.czasomierz)
+  oczekujaceAutosave.delete(identyfikatorInstancji)
+  try {
+    zapiszAutosaveSzczegolow(oczekujacy.autosave)
+  } catch (blad) {
+    if (oczekujacy.przyBledzie) oczekujacy.przyBledzie(blad)
+    else throw blad
+  }
+}
+
+export function zapiszAutosaveSzczegolowOdroczony(autosave: AutosaveSzczegolow, przyBledzie?: (blad: unknown) => void) {
+  const identyfikatorInstancji = autosave.identyfikatorInstancji ?? pobierzIdInstancjiSzczegolow()
+  const poprzedni = oczekujaceAutosave.get(identyfikatorInstancji)
+  if (poprzedni) clearTimeout(poprzedni.czasomierz)
+  const czasomierz = setTimeout(() => wykonajOczekujacyAutosave(identyfikatorInstancji), opoznienieAutosaveSzczegolowMs)
+  oczekujaceAutosave.set(identyfikatorInstancji, { autosave, czasomierz, przyBledzie })
+}
+
+export function wykonajOczekujaceAutosaveSzczegolow() {
+  for (const identyfikator of [...oczekujaceAutosave.keys()]) wykonajOczekujacyAutosave(identyfikator)
+}
+
 export function usunAutosaveSzczegolow(identyfikatorInstancji = pobierzIdInstancjiSzczegolow()) {
+  const oczekujacy = oczekujaceAutosave.get(identyfikatorInstancji)
+  if (oczekujacy) {
+    clearTimeout(oczekujacy.czasomierz)
+    oczekujaceAutosave.delete(identyfikatorInstancji)
+  }
   localStorage.removeItem(pobierzKluczAutosave(identyfikatorInstancji))
   const ostatniAutosave = bezpiecznieParsuj<AutosaveSzczegolow | null>(localStorage.getItem(kluczAutosave), null)
   if (ostatniAutosave?.identyfikatorInstancji === identyfikatorInstancji) localStorage.removeItem(kluczAutosave)

@@ -10,6 +10,8 @@ export function zbudujIndeksLokalizacjiSzczegolow(lokalizacje: Lokalizacja[]) {
   })
 
   return {
+    /** Lista, z której zbudowano indeks (ta sama referencja, bez kopii). */
+    zrodlo: lokalizacje,
     czyAktualny(nastepne: Lokalizacja[]) {
       return nastepne.length === migawka.length && nastepne.every((lokalizacja, indeks) => {
         const poprzednia = migawka[indeks]
@@ -34,3 +36,26 @@ export function zbudujIndeksLokalizacjiSzczegolow(lokalizacje: Lokalizacja[]) {
 }
 
 export type IndeksLokalizacjiSzczegolow = ReturnType<typeof zbudujIndeksLokalizacjiSzczegolow>
+
+let wspolnyIndeks: IndeksLokalizacjiSzczegolow | null = null
+
+/**
+ * Indeks dla wszystkich formularzy jest budowany raz na wersję kartoteki. Lista z `pobierzLokalizacjeZMagazynu` jest współdzielona
+ * i niemodyfikowalna, więc ta sama referencja oznacza te same dane. Ponowne wejście w widok nie klonuje już 70 tys. rekordów.
+ */
+export function pobierzWspolnyIndeksLokalizacji(lokalizacje: Lokalizacja[]): IndeksLokalizacjiSzczegolow {
+  if (wspolnyIndeks?.zrodlo !== lokalizacje) {
+    wspolnyIndeks = zbudujIndeksLokalizacjiSzczegolow(lokalizacje)
+  }
+
+  return wspolnyIndeks
+}
+
+/** Zwraca `obecny`, gdy dane się nie zmieniły. Przy tej samej referencji listy pomija porównywanie rekordów pole po polu. */
+export function odswiezIndeksLokalizacji(obecny: IndeksLokalizacjiSzczegolow, lokalizacje: Lokalizacja[]): IndeksLokalizacjiSzczegolow {
+  if (obecny.zrodlo === lokalizacje || obecny.czyAktualny(lokalizacje)) {
+    return obecny
+  }
+
+  return pobierzWspolnyIndeksLokalizacji(lokalizacje)
+}
