@@ -802,6 +802,8 @@ test('płynna edycja szczegółów z wieloma grupami i zachowanie bieżących da
     })
     await zmierz('kontrolaJakosci', () => strona.getByRole('button', { name: 'Kontrola jakości', exact: true }).click())
     await strona.locator('input[aria-label="Miejsce"]').first().fill('Sala klienta')
+    // Autosave jest odroczony (debounce), więc czekamy na zapis ostatniej zmiany zamiast zakładać zapis synchroniczny.
+    await strona.waitForFunction(() => JSON.parse(localStorage.getItem('ultimatePomagier.szczegolyOrganizacyjne.autosave') ?? 'null')?.grupy?.[0]?.miejsce === 'Sala klienta')
     const autosave = await strona.evaluate(() => JSON.parse(localStorage.getItem('ultimatePomagier.szczegolyOrganizacyjne.autosave')))
     assert.equal(autosave.grupy.length, 6)
     assert.equal(autosave.grupy[0].miejsce, 'Sala klienta')
@@ -857,6 +859,8 @@ test('płynna edycja szczegółów z wieloma grupami i zachowanie bieżących da
     await strona.getByRole('button', { name: 'Usuń grupę', exact: true }).nth(1).click()
     assert.equal(await strona.locator('input[aria-label="Miejsce"]').count(), 6)
     assert.equal(await strona.locator('input[id$="liczbaUczestnikow"]').nth(1).getAttribute('aria-invalid'), 'true')
+    const idGrupPoUsunieciu = stan.grupy.map((grupa) => grupa.id)
+    await strona.waitForFunction((ids) => JSON.stringify(JSON.parse(localStorage.getItem('ultimatePomagier.szczegolyOrganizacyjne.autosave') ?? 'null')?.grupy?.map((grupa) => grupa.id)) === JSON.stringify(ids), idGrupPoUsunieciu)
     const poUsunieciu = await strona.evaluate(() => JSON.parse(localStorage.getItem('ultimatePomagier.szczegolyOrganizacyjne.autosave')))
     assert.deepEqual(poUsunieciu.grupy.map((grupa) => grupa.id), stan.grupy.map((grupa) => grupa.id))
     assert.equal(poUsunieciu.grupy[0].liczbaUczestnikow, 25)
