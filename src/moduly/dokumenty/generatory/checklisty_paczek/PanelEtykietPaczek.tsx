@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { utworzNazwePlikuPdf, zapiszWyrenderowanyPdf } from '../../../../wspolne/dokumenty/eksportPdf'
+import { drukujDokument, utworzNazwePlikuPdf, zapiszWyrenderowanyPdf } from '../../../../wspolne/dokumenty/eksportPdf'
 import { oznaczSemantykePdf, zmierzScenePdf } from '../../../../wspolne/dokumenty/semantykaPdf'
 import { zakodujAdresEtykiety } from './kodQrEtykiety'
 import { celeEtykiety, czyWymiaryEtykietyPoprawne, pobierzEtykietyPaczek, type CelEtykiety, type EtykietaPaczki, type TrybEtykiety, type WymiaryEtykiety } from './modelEtykietyPaczki'
@@ -172,7 +172,7 @@ export default function PanelEtykietPaczek({ dokument, moznaZapisywac, zapisz, o
       [etykieta.paczkaId]: { ...korekta, ...zmiana } } }, 'Zapisano korektę etykiety paczki.')
   }
 
-  async function eksportuj(wybrane: EtykietaPaczki[]) {
+  async function eksportuj(wybrane: EtykietaPaczki[], czyDruk = false) {
     if (blokada.current || !moznaZapisywac || !czyPoprawnyFormat || (ustawienia.pola.logo && etykieta.logo && !logo)) return
     blokada.current = true
     ustawEksport(true)
@@ -192,7 +192,16 @@ export default function PanelEtykietPaczek({ dokument, moznaZapisywac, zapisz, o
       if (!zarejestrujEksportEtykiet(dokument.id, wybrane, `${wymiary.szerokosc} × ${wymiary.wysokosc} mm`, tryb, czyWydrukQr)) {
         throw new Error('Dane etykiety zmieniły się lub zapis jest niedostępny. Odśwież podgląd.')
       }
-      await zapiszWyrenderowanyPdf(pdf, nazwa)
+      if (czyDruk) {
+        for (const strona of strony) {
+          strona.style.setProperty('--szerokosc-druku', wymiary.szerokosc + 'mm')
+          strona.style.setProperty('--wysokosc-druku', wymiary.wysokosc + 'mm')
+          await drukujDokument(strona, 'pionowa', [wymiary.szerokosc, wymiary.wysokosc])
+        }
+        if (!czyWydrukQr && window.confirm('Czy etykiety zostały fizycznie wydrukowane?')) {
+          if (!zarejestrujEksportEtykiet(dokument.id, wybrane, wymiary.szerokosc + ' × ' + wymiary.wysokosc + ' mm', tryb, false, true)) throw new Error('Nie udało się potwierdzić wydruku.')
+        }
+      } else await zapiszWyrenderowanyPdf(pdf, nazwa)
       odswiez()
     } catch (blad) { ustawBlad(blad instanceof Error ? blad.message : 'Nie udało się przygotować PDF etykiety.') }
     finally { blokada.current = false; ustawEksport(false) }
@@ -277,6 +286,7 @@ export default function PanelEtykietPaczek({ dokument, moznaZapisywac, zapisz, o
       <button type="button" onClick={() => zapiszUstawienia({ pozycjeUniwersalne: [...ustawienia.pozycjeUniwersalne, { id: crypto.randomUUID(), nazwa: '', ilosc: null, czyUkryta: false }] })}>Dodaj pusty wiersz</button>
     </fieldset>}
     <div className="etykiety-paczek__eksport" role="group" aria-label="Eksport etykiet">
+      <button type="button" disabled={!czyMoznaEksportowac || przepelnione.includes(etykieta.paczkaId)} onClick={() => void eksportuj([etykieta], true)}>Drukuj etykietę</button>
       <button type="button" disabled={!czyMoznaEksportowac || przepelnione.includes(etykieta.paczkaId)} onClick={() => void eksportuj([etykieta])}>Pobierz PDF etykiety</button>
       <button type="button" disabled={!czyMoznaEksportowac || przepelnione.length > 0} onClick={() => void eksportuj(etykiety)}>Pobierz PDF wszystkich etykiet</button>
     </div>

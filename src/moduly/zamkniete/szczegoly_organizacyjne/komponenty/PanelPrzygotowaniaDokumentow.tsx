@@ -129,6 +129,16 @@ export default function PanelPrzygotowaniaDokumentow({ wersja, wersjaPakietu = w
                   {stan.dokument
                     ? <button type="button" onClick={() => otworzDokument(stan.dokument!)}>Otwórz</button>
                     : <button disabled={!wersja || Boolean(czyDokumentJestGrupowy(rodzaj) && !grupaId)} type="button" onClick={() => utworzPojedynczy(rodzaj, grupaId)}>Utwórz</button>}
+                  {rodzaj === 'checklista' && <button type="button" disabled={!wersja || !grupaId} onClick={() => {
+                    if (!wersja) return
+                    try {
+                      const wynik = utworzDokumentZeSzczegolow(wersja, 'checklista', grupaId, wersja.autorId)
+                      ustawWyniki([wynik])
+                      if (wynik.dokument) window.location.assign('/dokumenty/checklisty-paczek/' + encodeURIComponent(wynik.dokument.id) + '?etykiety=szkoleniowa')
+                    } catch (blad) {
+                      ustawWyniki([{ rodzaj, grupaId, etykieta: 'Etykiety paczek', status: 'blad', dokument: null, komunikat: blad instanceof Error ? blad.message : 'Nie udało się otworzyć etykiet.' }])
+                    }
+                  }}>Etykiety paczek</button>}
                 </article>
               )
             })

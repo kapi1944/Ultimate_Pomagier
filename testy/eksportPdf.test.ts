@@ -87,7 +87,7 @@ test('druk obejmuje wskazany obszar, czeka na obrazy i sprząta po anulowaniu lu
   let czyBladDruku = false
   const styl = { textContent: '', remove: () => { czyStylUsuniety = true } }
   const przodek = { parentElement: null, setAttribute: (klucz: string, wartosc: string) => atrybutyPrzodka.set(klucz, wartosc), removeAttribute: (klucz: string) => atrybutyPrzodka.delete(klucz) }
-  const obszar = { parentElement: przodek, querySelectorAll: () => [{ querySelectorAll: () => [{ decode: async () => { czyObrazGotowy = true } }] }], setAttribute: (klucz: string, wartosc: string) => atrybuty.set(klucz, wartosc), removeAttribute: (klucz: string) => atrybuty.delete(klucz) } as unknown as HTMLElement
+  const obszar = { matches: () => false, parentElement: przodek, querySelectorAll: () => [{ querySelectorAll: () => [{ decode: async () => { czyObrazGotowy = true } }] }], setAttribute: (klucz: string, wartosc: string) => atrybuty.set(klucz, wartosc), removeAttribute: (klucz: string) => atrybuty.delete(klucz) } as unknown as HTMLElement
   globalThis.document = { fonts: { ready: Promise.resolve() }, createElement: () => styl, head: { append: () => {} } } as unknown as Document
   globalThis.window = { addEventListener: zdarzenia.addEventListener.bind(zdarzenia), removeEventListener: zdarzenia.removeEventListener.bind(zdarzenia), print: () => {
     assert.ok(czyObrazGotowy)
@@ -108,7 +108,7 @@ test('druk obejmuje wskazany obszar, czeka na obrazy i sprząta po anulowaniu lu
     assert.equal(atrybuty.size, 0)
     assert.equal(atrybutyPrzodka.size, 0)
     assert.ok(czyStylUsuniety)
-    await assert.rejects(drukujDokument({ querySelectorAll: () => [] } as unknown as HTMLElement), /Nie znaleziono stron/)
+    await assert.rejects(drukujDokument({ matches: () => false, querySelectorAll: () => [] } as unknown as HTMLElement), /Nie znaleziono stron/)
   } finally {
     globalThis.window = poprzednieOkno
     globalThis.document = poprzedniDokument

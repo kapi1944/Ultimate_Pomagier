@@ -1022,3 +1022,72 @@ test('etykiety adaptacyjne: rzeczywiste PDF, geometria, 5–40 pozycji i trwały
     throw blad
   } finally { await przegladarka.close() }
 })
+
+test('etykiety 2.1: wejście uniwersalne, systemowy druk 100 × 150 i anulowanie', { timeout: 60000 }, async () => {
+ const przegladarka = await chromium.launch({ ...opcjePrzegladarki, headless: true })
+ try {
+  const strona = await przegladarka.newPage()
+  await strona.goto(adres + '/dokumenty/checklisty-paczek?etykiety=uniwersalna')
+  await strona.getByRole('button', { name: 'Otwórz demonstrację Architekta', exact: true }).click()
+  const panel = strona.getByRole('region', { name: 'Etykiety paczek', exact: true })
+  await panel.waitFor()
+  assert.equal(await panel.getByLabel('Rodzaj etykiety', { exact: true }).inputValue(), 'uniwersalna')
+  const sciezka = strona.url()
+  await strona.reload()
+  await panel.waitFor()
+  assert.equal(strona.url(), sciezka)
+  await strona.evaluate(() => { window.print = () => { window.probaDrukuEtykiety = true }; window.confirm = () => false })
+  await panel.getByRole('button', { name: 'Drukuj etykietę', exact: true }).click()
+  await strona.waitForFunction(() => window.probaDrukuEtykiety)
+  await strona.emulateMedia({ media: 'print' })
+  const geometria = await panel.locator('[data-etykieta]').first().evaluate((element) => ({ szerokosc: getComputedStyle(element).width, padding: getComputedStyle(element).paddingLeft }))
+  assert.ok(Math.abs(parseFloat(geometria.padding) * 25.4 / 96 - 4) < .1)
+  const bajty = await strona.pdf({ preferCSSPageSize: true, printBackground: true })
+  const pdf = await PDFDocument.load(bajty)
+  assert.equal(pdf.getPageCount(), 1)
+  assert.ok(Math.abs(pdf.getPage(0).getWidth() * 25.4 / 72 - 100) < .2)
+  assert.ok(Math.abs(pdf.getPage(0).getHeight() * 25.4 / 72 - 150) < .2)
+  await mkdir('tmp/etykiety21', { recursive: true })
+  await writeFile('tmp/etykiety21/druk-systemowy.pdf', bajty)
+  await strona.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+  await strona.emulateMedia({ media: 'screen' })
+  await strona.waitForFunction(() => !document.querySelector('[data-cel-druku-dokumentu]'))
+  assert.equal(await strona.evaluate(async () => {
+   const { pobierzChecklistyPaczek } = await import('/src/moduly/dokumenty/generatory/checklisty_paczek/rejestrChecklistPaczek.ts')
+   const dokumenty = pobierzChecklistyPaczek()
+   if (dokumenty.length !== 1) throw new Error('Powstał duplikat')
+   return dokumenty[0].daneDokumentu.historia.some((wpis) => wpis.wydrukEtykiety?.czyPotwierdzony)
+  }), false)
+ } finally { await przegladarka.close() }
+})
+
+test('etykiety 2.1: kafelek Szczegółów tworzy raz i otwiera etykiety grupy', { timeout: 60000 }, async () => {
+ const przegladarka = await chromium.launch({ ...opcjePrzegladarki, headless: true })
+ try {
+  const strona = await przegladarka.newPage()
+  await strona.goto(adres)
+  await strona.getByRole('button', { name: 'Otwórz demonstrację Architekta', exact: true }).click()
+  let identyfikator
+  for (let proba = 0; proba < 2; proba++) {
+   await strona.evaluate(async () => {
+    const React = await import('/node_modules/.vite/deps/react.js')
+    const { default: klient } = await import('/node_modules/.vite/deps/react-dom_client.js')
+    const { default: Panel } = await import('/src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/PanelPrzygotowaniaDokumentow.tsx')
+    const { poczatkoweDaneFormularza, poczatkowaGrupa, poczatkowiAdresaci } = await import('/src/moduly/zamkniete/szczegoly_organizacyjne/danePoczatkowe.ts')
+    const { zapiszWersjeRobocza } = await import('/src/moduly/zamkniete/szczegoly_organizacyjne/uslugi/magazynWersjiRoboczych.ts')
+    const wersja = { id: 'etykiety21-szczegoly', dokumentId: 'etykiety21-szczegoly', wersja: 'test', etykietaWersji: 'Test', nazwa: 'Szkolenie DT4x', dataZapisu: new Date().toISOString(), autorId: 'administrator-kacper-madej', autorNazwa: 'Architekt', dane: { ...structuredClone(poczatkoweDaneFormularza), tytulSzkolenia: 'Szkolenie DT4x', organizator: 'IIST', wysylkaPaczkiDotyczy: true }, grupy: [{ ...structuredClone(poczatkowaGrupa), id: 'grupa21', nazwa: 'Grupa DT4x', liczbaUczestnikow: 12 }], adresaci: poczatkowiAdresaci, statusyPol: {} }
+    zapiszWersjeRobocza(wersja)
+    const kontener = document.createElement('div'); kontener.id = 'panel-testowy21'; document.body.append(kontener)
+    klient.createRoot(kontener).render(React.default.createElement(Panel, { wersja, otworzDokument: () => {}, poUtworzeniu: () => {} }))
+   })
+   await strona.locator('#panel-testowy21').getByRole('button', { name: 'Etykiety paczek', exact: true }).click()
+   await strona.getByRole('region', { name: 'Etykiety paczek', exact: true }).waitFor()
+   if (identyfikator) assert.equal(strona.url(), identyfikator)
+   identyfikator = strona.url()
+  }
+  assert.equal(await strona.evaluate(async () => {
+   const { pobierzChecklistyPaczek } = await import('/src/moduly/dokumenty/generatory/checklisty_paczek/rejestrChecklistPaczek.ts')
+   return pobierzChecklistyPaczek().filter((dokument) => dokument.daneDokumentu.grupaId === 'grupa21').length
+  }), 1)
+ } finally { await przegladarka.close() }
+})

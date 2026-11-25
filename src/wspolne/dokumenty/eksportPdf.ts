@@ -79,16 +79,16 @@ export async function zapiszWyrenderowanyPdf(pdf: DokumentPdf, nazwa: string) {
   pdf.save(nazwa)
 }
 
-export async function drukujDokument(obszar?: HTMLElement, orientacja: 'pionowa' | 'pozioma' = 'pionowa', format: 'a4' | 'a5' | 'a6' = 'a4', plynnyUklad = false) {
+export async function drukujDokument(obszar?: HTMLElement, orientacja: 'pionowa' | 'pozioma' = 'pionowa', format: 'a4' | 'a5' | 'a6' | [number, number] = 'a4', plynnyUklad = false) {
   if (!obszar) { window.print(); return }
-  const strony = plynnyUklad ? [obszar] : pobierzStronyDokumentu(obszar)
+  const strony = plynnyUklad || obszar.matches('[data-strona-dokumentu]') ? [obszar] : pobierzStronyDokumentu(obszar)
   if (!strony.length) throw new Error('Nie znaleziono stron dokumentu do druku.')
   await document.fonts?.ready
   await Promise.all(strony.flatMap((strona) => Array.from(strona.querySelectorAll('img')).map((obraz) => obraz.decode())))
   const przodkowie: HTMLElement[] = []
   for (let element = obszar.parentElement; element; element = element.parentElement) przodkowie.push(element)
   const stylStrony = document.createElement('style')
-  const rozmiar = `${format.toUpperCase()} ${orientacja === 'pozioma' ? 'landscape' : 'portrait'}`
+  const rozmiar = Array.isArray(format) ? `${format[0]}mm ${format[1]}mm` : `${format.toUpperCase()} ${orientacja === 'pozioma' ? 'landscape' : 'portrait'}`
   stylStrony.textContent = plynnyUklad
     ? `@page { size: ${rozmiar}; margin: 9mm; background: white; }`
     : `@page dokument-generatora { size: ${rozmiar}; margin: 0; }`

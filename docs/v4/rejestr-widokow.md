@@ -142,7 +142,7 @@ Właściciel pliku obejmuje wszystkie warunki renderowania, stany pusty/błąd/�
 | `src/moduly/dokumenty/generatory/ankiety/RendererAnkiety.tsx` | V4-12 | — | — | 0 |
 | `src/moduly/dokumenty/generatory/ankiety/WidokAnkiet.tsx` | V4-12 | — | — | 2 |
 | `src/moduly/dokumenty/generatory/checklisty_paczek/CelEtykietyPaczki.tsx` | V4-15 | — | — | 0 |
-| `src/moduly/dokumenty/generatory/checklisty_paczek/PanelEtykietPaczek.tsx` | V4-15 | — | — | 3 |
+| `src/moduly/dokumenty/generatory/checklisty_paczek/PanelEtykietPaczek.tsx` | V4-15 | — | — | 4 |
 | `src/moduly/dokumenty/generatory/checklisty_paczek/PodgladWydrukuPaczki.tsx` | V4-15 | — | — | 0 |
 | `src/moduly/dokumenty/generatory/checklisty_paczek/WeryfikacjaZdjeciaPaczki.tsx` | V4-15 | — | — | 0 |
 | `src/moduly/dokumenty/generatory/checklisty_paczek/WidokChecklistPaczek.tsx` | V4-15 | — | — | 9 |
