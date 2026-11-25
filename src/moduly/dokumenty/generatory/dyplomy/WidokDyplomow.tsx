@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react'
 import type { CSSProperties, ChangeEvent } from 'react'
-import { pobierzNazwyMiejscowosci } from '../../../../kartoteki/lokalizacje/magazynLokalizacji'
+import { ListaPodpowiedziMiejscowosci } from '../../../../kartoteki/lokalizacje/ListaPodpowiedziMiejscowosci'
 import type { TrybTytuluDyplomu } from '../../../../wspolne/dokumenty/typyDokumentu'
 import AkcjeEksportuPdf from '../../../../wspolne/dokumenty/AkcjeEksportuPdf'
 import { zapiszDokumentRoboczyGeneratora } from '../../../../wspolne/dokumenty/zapisDokumentuGeneratora'
@@ -208,12 +208,6 @@ function pobierzEtykieteTrybu(trybTytulu: TrybTytuluDyplomu) {
   }
 
   return 'Certyfikat'
-}
-
-function wybierzPodpowiedziMiejscowosci(miejscowosci: string[], wartosc: string) {
-  const fraza = wartosc.trim().toLocaleLowerCase('pl')
-
-  return miejscowosci.filter((miejscowosc) => !fraza || miejscowosc.toLocaleLowerCase('pl').includes(fraza)).slice(0, 50)
 }
 
 function wybierzPodpowiedziTrenerow(trenerzy: TrenerKartoteki[], wartosc: string) {
@@ -1066,11 +1060,6 @@ export default function WidokDyplomow() {
     { etykieta: 'Miejsce szkolenia', uzupelnione: dane.trybSzkolenia === 'online' || Boolean(dane.miejsceSzkolenia.trim()) },
     { etykieta: 'Numery rejestru uczestników', uzupelnione: uczestnicyDoDruku.length > 0 && uczestnicyDoDruku.every((uczestnik) => uczestnik.numerRejestru.trim()) },
   ]
-  const miejscowosciDoPodpowiedzi = useMemo(() => pobierzNazwyMiejscowosci(), [])
-  const podpowiedziMiejscaSzkolenia = useMemo(
-    () => wybierzPodpowiedziMiejscowosci(miejscowosciDoPodpowiedzi, dane.miejsceSzkolenia),
-    [dane.miejsceSzkolenia, miejscowosciDoPodpowiedzi],
-  )
 
   const trenerzyDoWyboru = useMemo(
     () => pobierzTrenerowZKartoteki().sort((pierwszy, drugi) => pierwszy.imieNazwisko.localeCompare(drugi.imieNazwisko, 'pl')),
@@ -1761,11 +1750,7 @@ export default function WidokDyplomow() {
                   type="text"
                   value={pobierzMiejsceSzkolenia(dane)}
                 />
-                <datalist id="dyplomy-miejscowosci-szkolenia">
-                  {podpowiedziMiejscaSzkolenia.map((miejscowosc) => (
-                    <option key={miejscowosc} value={miejscowosc} />
-                  ))}
-                </datalist>
+                <ListaPodpowiedziMiejscowosci fraza={dane.miejsceSzkolenia} id="dyplomy-miejscowosci-szkolenia" />
               </label>
 
               <label className="dyplomy__pole">

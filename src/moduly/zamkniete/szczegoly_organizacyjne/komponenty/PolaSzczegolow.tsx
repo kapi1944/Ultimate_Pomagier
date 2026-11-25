@@ -1,3 +1,4 @@
+import { ListaPodpowiedziMiejscowosci } from '../../../../kartoteki/lokalizacje/ListaPodpowiedziMiejscowosci'
 import { KontekstZatwierdzania } from './zatwierdzaniePol'
 import { useContext, useState, type ComponentPropsWithoutRef, type ReactNode } from 'react'
 import { etykietyStatusowPol, klasyStatusowPol } from '../stale'
@@ -22,7 +23,8 @@ type WlasciwosciPolaTekstowego = WspolneWlasciwosciPola & {
   typ?: 'text' | 'email' | 'tel' | 'date' | 'time' | 'url'
   placeholder?: string
   listaPodpowiedziId?: string
-  podpowiedzi?: string[]
+  /** Podpowiada miejscowości z kartoteki (najpierw zaczynające się od wpisu, potem zawierające go); wymaga `listaPodpowiedziId`. */
+  podpowiadajMiejscowosci?: boolean
 }
 
 type WlasciwosciPolaLiczbowego = WspolneWlasciwosciPola & {
@@ -124,7 +126,7 @@ export function PoleTekstowe({
   typ = 'text',
   placeholder,
   listaPodpowiedziId,
-  podpowiedzi,
+  podpowiadajMiejscowosci,
   blad,
   disabled,
   idGrupy,
@@ -144,13 +146,7 @@ export function PoleTekstowe({
         value={wartosc}
         onChange={(zdarzenie) => ustawWartosc(zdarzenie.target.value)}
       />
-      {listaPodpowiedziId && podpowiedzi && (
-        <datalist id={listaPodpowiedziId}>
-          {podpowiedzi.map((podpowiedz) => (
-            <option key={podpowiedz} value={podpowiedz} />
-          ))}
-        </datalist>
-      )}
+      {listaPodpowiedziId && podpowiadajMiejscowosci && <ListaPodpowiedziMiejscowosci fraza={wartosc} id={listaPodpowiedziId} />}
     </OpakowaniePola>
   )
 }

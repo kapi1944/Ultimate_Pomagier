@@ -1,5 +1,6 @@
 import { kluczKlientow, pobierzKlientowZKartoteki, type KlientKartoteki } from './klienciKartoteki'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { zaladujCalyKatalogLokalizacji } from './lokalizacje/ladowanieKatalogu'
 import {
   pobierzLokalizacjeZMagazynu,
   zapiszLokalizacjeWMagazynie,
@@ -587,6 +588,8 @@ export default function WidokKartotek({ aktywnaZakladkaPoczatkowa = 'trenerzy', 
   const [trenerzy, ustawTrenerow] = useState<TrenerKartoteki[]>(() => uzupelnijBazeTrenerow(pobierzZMagazynu(kluczTrenerow, przygotujTrenerowStartowych())))
   const [klienci, ustawKlientow] = useState<KlientKartoteki[]>(pobierzKlientowZKartoteki)
   const [lokalizacje, ustawLokalizacje] = useState<Lokalizacja[]>(pobierzLokalizacjeZMagazynu)
+  // Pełny katalog (kilkadziesiąt tysięcy rekordów) jest wczytywany dopiero po wejściu w zakładkę lokalizacji.
+  const [stanKataloguLokalizacji, ustawStanKataloguLokalizacji] = useState<'oczekuje' | 'gotowy' | 'blad'>('oczekuje')
   const [filtrTypuElementu, ustawFiltrTypuElementu] = useState<TypElementuKartoteki>('wszystkie')
   const [szukanyElementKartoteki, ustawSzukanyElementKartoteki] = useState('')
   const [elementyKartoteki, ustawElementyKartoteki] = useState<DaneElementuKartoteki[]>([])
@@ -622,8 +625,36 @@ export default function WidokKartotek({ aktywnaZakladkaPoczatkowa = 'trenerzy', 
   }, [klienci])
 
   useEffect(() => {
-    zapiszLokalizacjeWMagazynie(lokalizacje)
-  }, [lokalizacje])
+    // Nie zapisujemy listy częściowej: przed wczytaniem katalogu zawiera ona tylko zmiany użytkownika.
+    if (stanKataloguLokalizacji === 'gotowy') {
+      zapiszLokalizacjeWMagazynie(lokalizacje)
+    }
+  }, [lokalizacje, stanKataloguLokalizacji])
+
+  useEffect(() => {
+    if (aktywnaZakladka !== 'lokalizacje' || stanKataloguLokalizacji !== 'oczekuje') {
+      return
+    }
+
+    let anulowano = false
+    zaladujCalyKatalogLokalizacji()
+      .then(() => {
+        if (!anulowano) {
+          ustawLokalizacje(pobierzLokalizacjeZMagazynu())
+          ustawStanKataloguLokalizacji('gotowy')
+        }
+      })
+      .catch((blad: unknown) => {
+        console.warn('Nie udało się wczytać kartoteki lokalizacji.', blad)
+        if (!anulowano) {
+          ustawStanKataloguLokalizacji('blad')
+        }
+      })
+
+    return () => {
+      anulowano = true
+    }
+  }, [aktywnaZakladka, stanKataloguLokalizacji])
 
   useEffect(() => {
     const uchwyt = window.setTimeout(() => {
@@ -1332,11 +1363,20 @@ export default function WidokKartotek({ aktywnaZakladkaPoczatkowa = 'trenerzy', 
               </select>
             </div>
             <div className="kartoteki__pasek">
-              <span>
-                Załadowano {lokalizacje.length} lokalizacji. Widocznych pozycji: {lokalizacjeNaStronie.length} z {lokalizacjeFiltrowane.length}.
+              <span role={stanKataloguLokalizacji === 'blad' ? 'alert' : 'status'}>
+                {stanKataloguLokalizacji === 'blad'
+                  ? 'Nie udało się wczytać kartoteki lokalizacji. Sprawdź instalację aplikacji i spróbuj ponownie.'
+                  : stanKataloguLokalizacji === 'gotowy'
+                    ? `Załadowano ${lokalizacje.length} lokalizacji. Widocznych pozycji: ${lokalizacjeNaStronie.length} z ${lokalizacjeFiltrowane.length}.`
+                    : 'Wczytywanie kartoteki lokalizacji…'}
               </span>
               <div className="kartoteki__akcje">
-                <button className="kartoteki__przycisk" type="button" onClick={otworzDodawanieLokalizacji}>
+                {stanKataloguLokalizacji === 'blad' && (
+                  <button className="kartoteki__przycisk" type="button" onClick={() => ustawStanKataloguLokalizacji('oczekuje')}>
+                    Spróbuj ponownie
+                  </button>
+                )}
+                <button className="kartoteki__przycisk" disabled={stanKataloguLokalizacji !== 'gotowy'} type="button" onClick={otworzDodawanieLokalizacji}>
                   + Dodaj lokalizację
                 </button>
               </div>

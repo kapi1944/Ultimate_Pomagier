@@ -123,6 +123,7 @@ Właściciel pliku obejmuje wszystkie warunki renderowania, stany pusty/błąd/�
 | `src/aplikacja/ustawienia/UstawieniaHarmonogramu.tsx` | V4-22 | V4-04 | — | 0 |
 | `src/aplikacja/ustawienia/WidokUstawien.tsx` | V4-22 | V4-01, V4-02 | V4-01, V4-02 | 5 |
 | `src/kartoteki/WidokKartotek.tsx` | V4-20 | V4-21 | — | 7 |
+| `src/kartoteki/lokalizacje/ListaPodpowiedziMiejscowosci.tsx` | V4-20 | V4-07, V4-13, V4-15 | — | 0 |
 | `src/kartoteki/szablony_dokumentow/WidokSzablonowDokumentow.tsx` | V4-21 | V4-20 | — | 1 |
 | `src/kartoteki/uzytkownicy/WidokProfiluUzytkownika.tsx` | V4-21 | — | — | 1 |
 | `src/kartoteki/uzytkownicy/OchronaKartotekiUzytkownikow.tsx` | V4-21 | — | — | 1 |

@@ -727,7 +727,7 @@ test('checklisty: pisanie nie zapisuje rejestru co znak, podpowiedzi zachowują 
     // Po zapisie historia nie może uruchamiać kolejnych zapisów bez edycji.
     await strona.waitForTimeout(1000)
     assert.equal(await strona.evaluate(() => window.zapisyChecklisty), 1)
-    assert.ok(await strona.locator('#checklista-miejscowosci option').count() > 0)
+    await strona.waitForFunction(() => document.querySelectorAll('#checklista-miejscowosci option').length > 0)
     assert.ok(await strona.locator('#checklista-trenerzy option').count() > 0)
     const trener = await strona.locator('#checklista-trenerzy option').first().getAttribute('value')
     const trenerzy = strona.getByLabel('Trenerzy (oddziel przecinkiem)', { exact: true })

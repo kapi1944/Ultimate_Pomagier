@@ -1,35 +1,29 @@
-import tekstLokalizacjiCsv from './dane/kartoteka_lokalizacje_miejscowosci_2019.csv?raw'
-import { importujLokalizacjeZCsv } from './importerLokalizacji'
+import {
+  pobierzWersjeDanychKataloguLokalizacji,
+  pobierzZaladowanyIndeksKatalogu,
+  pobierzZaladowaneLokalizacjeStartowe,
+  zaladujIndeksKataloguLokalizacji,
+} from './ladowanieKatalogu'
 import type { Lokalizacja } from './typyLokalizacji'
+import {
+  brakPodpowiedziMiejscowosci,
+  normalizujFrazeMiejscowosci,
+  type PodpowiedziMiejscowosci,
+  wybierzPodpowiedziMiejscowosci,
+} from './wyszukiwanieMiejscowosci'
 
 const kluczLokalizacji = 'ultimate-pomagier.kartoteki.lokalizacje'
 
-// Kartoteka startowa liczy ponad 70 tys. rekordów. Parsowanie na poziomie modułu blokowało start całej aplikacji,
-// dlatego dane są budowane dopiero przy pierwszym użyciu (albo w rozgrzewce po pierwszym renderze).
-type DaneStartowe = {
-  wynikImportu: ReturnType<typeof importujLokalizacjeZCsv>
-  lokalizacje: Lokalizacja[]
-  wedlugKlucza: Map<string, Lokalizacja>
-}
+/**
+ * Kartoteka lokalizacji składa się z dwóch części:
+ *  - danych startowych: statycznego katalogu ładowanego na żądanie (`ladowanieKatalogu.ts`), podzielonego na województwa,
+ *  - zmian użytkownika: różnic względem katalogu, zapisanych w localStorage pod `kluczLokalizacji` (format bez zmian).
+ * Funkcje synchroniczne działają na tym, co jest już wczytane. Zmiany użytkownika są zawsze dostępne w całości.
+ */
 
-let daneStartowe: DaneStartowe | null = null
-
-function pobierzDaneStartowe(): DaneStartowe {
-  if (!daneStartowe) {
-    const wynikImportu = importujLokalizacjeZCsv(tekstLokalizacjiCsv)
-    daneStartowe = {
-      wynikImportu,
-      lokalizacje: wynikImportu.lokalizacje,
-      wedlugKlucza: new Map(wynikImportu.lokalizacje.map((lokalizacja) => [lokalizacja.klucz_lokalizacji, lokalizacja])),
-    }
-  }
-
-  return daneStartowe
-}
-
-/** Przygotowuje kartotekę startową w czasie bezczynności, aby pierwszy widok korzystający z lokalizacji nie czekał na parsowanie. */
+/** Przygotowuje indeks nazw w czasie bezczynności, aby pierwsze podpowiedzi nie czekały na pobranie pliku. */
 export function rozgrzejKartotekeLokalizacji() {
-  pobierzDaneStartowe()
+  return zaladujIndeksKataloguLokalizacji().then(() => undefined)
 }
 
 function czyObiekt(wartosc: unknown): wartosc is Record<string, unknown> {
@@ -85,64 +79,113 @@ function odczytajLokalizacjeZMagazynu(zapis: string | null) {
   }
 }
 
-function scalLokalizacje(seed: Lokalizacja[], zapisane: Lokalizacja[]) {
-  // Najczęstszy przypadek: użytkownik nie zmienił kartoteki. Zwracamy współdzieloną listę startową bez kopiowania 70 tys. rekordów.
-  if (zapisane.length === 0) {
-    return seed
+// Zmiany użytkownika są parsowane raz dla danego zapisu w localStorage.
+let pamiecZmian: { zapis: string | null; zmiany: Lokalizacja[] } | null = null
+
+/** Zmiany użytkownika względem katalogu startowego (zmodyfikowane rekordy startowe i własne lokalizacje). Lista współdzielona, nie wolno jej modyfikować. */
+export function pobierzZmianyLokalizacji() {
+  const zapis = odczytajZapisLokalizacji()
+
+  if (pamiecZmian?.zapis !== zapis) {
+    pamiecZmian = { zapis, zmiany: odczytajLokalizacjeZMagazynu(zapis) }
   }
 
-  const mapa = new Map(seed.map((lokalizacja) => [lokalizacja.klucz_lokalizacji, lokalizacja]))
+  return pamiecZmian.zmiany
+}
 
-  zapisane.forEach((lokalizacja) => {
+function scalLokalizacje(startowe: Lokalizacja[], zmiany: Lokalizacja[]) {
+  // Najczęstszy przypadek: użytkownik nie zmienił kartoteki. Zwracamy współdzieloną listę startową bez kopiowania rekordów.
+  if (zmiany.length === 0) {
+    return startowe
+  }
+
+  const mapa = new Map(startowe.map((lokalizacja) => [lokalizacja.klucz_lokalizacji, lokalizacja]))
+
+  zmiany.forEach((lokalizacja) => {
     mapa.set(lokalizacja.klucz_lokalizacji, lokalizacja)
   })
 
   return [...mapa.values()]
 }
 
-export function pobierzLokalizacjeStartowe() {
-  return pobierzDaneStartowe().lokalizacje
-}
+// Scalona lista jest pamiętana dla tego samego zapisu i tej samej wersji wczytanych danych. Jest współdzielona i nie wolno jej modyfikować w miejscu.
+let pamiecScalonychLokalizacji: { zapis: string | null; wersja: number; lokalizacje: Lokalizacja[] } | null = null
 
-export function pobierzBledyImportuStartowego() {
-  return pobierzDaneStartowe().wynikImportu.bledy
-}
-
-// Scalona lista jest pamiętana dla tego samego zapisu w localStorage, bo budowanie mapy 70 tys. rekordów
-// przy każdym wywołaniu było kosztowne. Zwracana lista jest współdzielona i nie wolno jej modyfikować w miejscu.
-let pamiecScalonychLokalizacji: { zapis: string | null; lokalizacje: Lokalizacja[] } | null = null
-
+/**
+ * Lokalizacje dostępne w pamięci: rekordy startowe wczytanych województw ze zmianami użytkownika.
+ * Pełna lista jest dostępna po `zaladujCalyKatalogLokalizacji()`; do rozpoznania konkretnej nazwy wystarczy `zaladujLokalizacjeDlaNazw`.
+ */
 export function pobierzLokalizacjeZMagazynu() {
   const zapis = odczytajZapisLokalizacji()
+  const wersja = pobierzWersjeDanychKataloguLokalizacji()
 
-  if (pamiecScalonychLokalizacji && pamiecScalonychLokalizacji.zapis === zapis) {
+  if (pamiecScalonychLokalizacji && pamiecScalonychLokalizacji.zapis === zapis && pamiecScalonychLokalizacji.wersja === wersja) {
     return pamiecScalonychLokalizacji.lokalizacje
   }
 
-  const lokalizacje = scalLokalizacje(pobierzDaneStartowe().lokalizacje, odczytajLokalizacjeZMagazynu(zapis))
-  pamiecScalonychLokalizacji = { zapis, lokalizacje }
+  const lokalizacje = scalLokalizacje(pobierzZaladowaneLokalizacjeStartowe(), pobierzZmianyLokalizacji())
+  pamiecScalonychLokalizacji = { zapis, wersja, lokalizacje }
   return lokalizacje
 }
 
+type NazwyMiejscowosci = { nazwy: readonly string[]; nazwyMale: readonly string[] }
+let pamiecNazw: { zapis: string | null; indeks: object | null; nazwy: NazwyMiejscowosci } | null = null
 const kolatorPolski = new Intl.Collator('pl')
-let pamiecNazwMiejscowosci: { zrodlo: Lokalizacja[]; nazwy: string[] } | null = null
 
-/** Posortowane, unikalne nazwy miejscowości. Lista jest budowana raz dla danej wersji kartoteki i współdzielona przez widoki; nie wolno jej modyfikować. */
-export function pobierzNazwyMiejscowosci(lokalizacje: Lokalizacja[] = pobierzLokalizacjeZMagazynu()) {
-  if (pamiecNazwMiejscowosci && pamiecNazwMiejscowosci.zrodlo === lokalizacje) {
-    return pamiecNazwMiejscowosci.nazwy
+/** Posortowane, unikalne nazwy miejscowości z katalogu oraz z własnych lokalizacji użytkownika. `null`, dopóki indeks katalogu nie jest wczytany. */
+export function pobierzNazwyMiejscowosci(): NazwyMiejscowosci | null {
+  const indeks = pobierzZaladowanyIndeksKatalogu()
+
+  if (!indeks) {
+    return null
   }
 
-  const nazwy = [...new Set(lokalizacje.map((lokalizacja) => lokalizacja.nazwa))].sort(kolatorPolski.compare)
-  pamiecNazwMiejscowosci = { zrodlo: lokalizacje, nazwy }
+  const zapis = odczytajZapisLokalizacji()
+
+  if (pamiecNazw && pamiecNazw.zapis === zapis && pamiecNazw.indeks === indeks) {
+    return pamiecNazw.nazwy
+  }
+
+  const znane = new Set(indeks.nazwyMale)
+  const wlasne = [...new Map(pobierzZmianyLokalizacji().filter((zmiana) => !znane.has(normalizujFrazeMiejscowosci(zmiana.nazwa))).map((zmiana) => [normalizujFrazeMiejscowosci(zmiana.nazwa), zmiana.nazwa])).values()]
+  let nazwy: NazwyMiejscowosci = { nazwy: indeks.nazwy, nazwyMale: indeks.nazwyMale }
+
+  if (wlasne.length > 0) {
+    const polaczone = [...indeks.nazwy, ...wlasne].sort(kolatorPolski.compare)
+    nazwy = { nazwy: polaczone, nazwyMale: polaczone.map((nazwa) => normalizujFrazeMiejscowosci(nazwa)) }
+  }
+
+  pamiecNazw = { zapis, indeks, nazwy }
   return nazwy
+}
+
+let ostatniaPodpowiedz: { nazwy: NazwyMiejscowosci; fraza: string; limit: number | undefined; wynik: PodpowiedziMiejscowosci } | null = null
+
+/**
+ * Podpowiedzi miejscowości: najpierw nazwy zaczynające się od frazy, potem zawierające ją. Pusty wynik, dopóki indeks nie jest wczytany.
+ * Ostatni wynik jest pamiętany, więc ponowne renderowanie z tą samą frazą nie skanuje listy i zwraca ten sam obiekt.
+ */
+export function podpowiedzMiejscowosci(fraza: string, limit?: number): PodpowiedziMiejscowosci {
+  const nazwy = pobierzNazwyMiejscowosci()
+
+  if (!nazwy) {
+    return brakPodpowiedziMiejscowosci
+  }
+
+  if (ostatniaPodpowiedz?.nazwy === nazwy && ostatniaPodpowiedz.fraza === fraza && ostatniaPodpowiedz.limit === limit) {
+    return ostatniaPodpowiedz.wynik
+  }
+
+  const wynik = wybierzPodpowiedziMiejscowosci(nazwy.nazwy, nazwy.nazwyMale, fraza, limit)
+  ostatniaPodpowiedz = { nazwy, fraza, limit, wynik }
+  return wynik
 }
 
 export function zapiszLokalizacjeWMagazynie(lokalizacje: Lokalizacja[]) {
   try {
-    const lokalizacjeStartoweWedlugKlucza = pobierzDaneStartowe().wedlugKlucza
+    const startoweWedlugKlucza = new Map(pobierzZaladowaneLokalizacjeStartowe().map((lokalizacja) => [lokalizacja.klucz_lokalizacji, lokalizacja]))
     const zmianyUzytkownika = lokalizacje.filter((lokalizacja) => {
-      const lokalizacjaStartowa = lokalizacjeStartoweWedlugKlucza.get(lokalizacja.klucz_lokalizacji)
+      const lokalizacjaStartowa = startoweWedlugKlucza.get(lokalizacja.klucz_lokalizacji)
 
       return (
         !lokalizacjaStartowa ||
@@ -178,20 +221,30 @@ export function znajdzLokalizacjeDlaMiejsca(miejsce: string, lokalizacje = pobie
   return dopasowania.length === 1 ? dopasowania[0] : null
 }
 
+/**
+ * Zapisuje potwierdzony miejscownik. Rekord musi być wczytany (wybrana lokalizacja zawsze jest); zapisujemy tylko tę jedną zmianę,
+ * zachowując wcześniejsze zmiany użytkownika, także dla województw, które nie są teraz w pamięci.
+ */
 export function ustawPotwierdzonyMiejscownikLokalizacji(klucz_lokalizacji: string, miejscownik_pelny_auto: string) {
-  const lokalizacje = pobierzLokalizacjeZMagazynu()
-  const zmienione = lokalizacje.map((lokalizacja) =>
-    lokalizacja.klucz_lokalizacji === klucz_lokalizacji
-      ? {
-          ...lokalizacja,
-          miejscownik_pelny_auto: miejscownik_pelny_auto.trim(),
-          status_odmiany: true,
-        }
-      : lokalizacja,
-  )
+  const obecna = znajdzLokalizacjePoKluczu(klucz_lokalizacji)
 
-  zapiszLokalizacjeWMagazynie(zmienione)
-  return znajdzLokalizacjePoKluczu(klucz_lokalizacji, zmienione)
+  if (!obecna) {
+    return null
+  }
+
+  const zmieniona: Lokalizacja = { ...obecna, miejscownik_pelny_auto: miejscownik_pelny_auto.trim(), status_odmiany: true }
+  const zmiany = pobierzZmianyLokalizacji()
+  const nastepneZmiany = zmiany.some((zmiana) => zmiana.klucz_lokalizacji === klucz_lokalizacji)
+    ? zmiany.map((zmiana) => (zmiana.klucz_lokalizacji === klucz_lokalizacji ? zmieniona : zmiana))
+    : [...zmiany, zmieniona]
+
+  try {
+    localStorage.setItem(kluczLokalizacji, JSON.stringify(nastepneZmiany))
+  } catch {
+    return null
+  }
+
+  return zmieniona
 }
 
 export function pobierzPotwierdzonyMiejscownikLokalizacji(klucz_lokalizacji: string) {

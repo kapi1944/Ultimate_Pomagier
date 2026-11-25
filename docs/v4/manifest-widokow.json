@@ -592,6 +592,16 @@
         "V4-21"
       ]
     },
+    "src/kartoteki/lokalizacje/ListaPodpowiedziMiejscowosci.tsx": {
+      "zadanie": "V4-20",
+      "powierzchnie": [],
+      "ukonczoneEtapy": [],
+      "wspoldzieloneZ": [
+        "V4-07",
+        "V4-13",
+        "V4-15"
+      ]
+    },
     "src/kartoteki/szablony_dokumentow/WidokSzablonowDokumentow.tsx": {
       "zadanie": "V4-21",
       "powierzchnie": [
