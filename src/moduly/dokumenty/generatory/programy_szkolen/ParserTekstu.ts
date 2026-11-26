@@ -1,4 +1,4 @@
-import { rozpoznajKategorieWcieciaProgramu, normalizujWierszWejsciowy, rozpoznajOznaczenieProgramu, wyznaczPoziomyProgramu, type OznaczenieProgramu, type UstawienieWierszaProgramu } from './oznaczeniaProgramu.ts'
+import { rozpoznajKategorieWcieciaProgramu, normalizujWierszWejsciowy, rozpoznajOznaczenieProgramu, wyznaczLiterowoscOznaczen, wyznaczPoziomyProgramu, type OznaczenieProgramu, type UstawienieWierszaProgramu } from './oznaczeniaProgramu.ts'
 import type { BlokDokumentu, DokumentBlokowy, ProblemDokumentu } from '../../../../wspolne/dokumenty/modelBlokowy'
 import { utworzModelStronyProgramu } from './geometriaStronyProgramu.ts'
 
@@ -69,6 +69,7 @@ type WierszProgramu = {
   tresc: string
   poziom: number
   czyPrzerwaPrzed?: boolean
+  czyLitera?: boolean
 }
 
 type ZrodloModulu = 'arabski' | 'rzymski' | 'nienumerowany' | 'techniczny'
@@ -91,6 +92,9 @@ const wzorzecTytuluTechnicznego = /^program szkolenia$/i
 const wzorzecInformacjiOrganizacyjnych = /^informacje organizacyjne$/i
 const wzorzecProgramuPartnerskiego = /szkolenie realizowane w ramach programu partnerskiego/i
 const wzorzecNotatkiOnline = /w przypadku szkolenia w formule on-?line/i
+// Enter oraz separatory wierszy z Worda/HTML: U+2028, U+2029, tabulator pionowy, wysuw strony i NEL.
+// eslint-disable-next-line no-control-regex -- tabulator pionowy i wysuw strony są świadomie traktowane jak koniec wiersza
+const wzorzecKoncaWiersza = /\r?\n|[\u2028\u2029\u000B\u000C\u0085]/
 const wzorzecZakonczeniaZdania = /[.;:?]$/
 const skrotyChronione = ['m.in.', 'np.', 'tj.', 'tzn.', 'art.', 'ust.', 'pkt.', 'dz.u.']
 const znacznikiFormatowaniaLinii = ['**', '++', '*']
@@ -315,8 +319,8 @@ function czyTytulTechniczny(tresc: string) {
 }
 
 function przygotujWiersze(tresc: string) {
-  const suroweWiersze = tresc.split(/\r?\n/).map(normalizujWierszWejsciowy)
-  return suroweWiersze
+  const suroweWiersze = tresc.split(wzorzecKoncaWiersza).map(normalizujWierszWejsciowy)
+  const wiersze = suroweWiersze
     .map((surowy, indeks) => ({
       indeks,
       czyPrzerwaPrzed: indeks > 0 && !suroweWiersze[indeks - 1].trim(),
@@ -325,6 +329,9 @@ function przygotujWiersze(tresc: string) {
       poziom: policzPoziomWciecia(pobierzWciecie(surowy)),
     }))
     .filter((wiersz) => wiersz.tresc)
+  const czyLitery = wyznaczLiterowoscOznaczen(wiersze.map((wiersz) => wiersz.tresc))
+
+  return wiersze.map((wiersz, indeks): WierszProgramu => ({ ...wiersz, czyLitera: czyLitery[indeks] }))
 }
 
 function zbudujEtykieteDnia(dzien: RegExpMatchArray) {
@@ -417,12 +424,21 @@ function polaczTekst(pierwszy: string, drugi: string) {
   return `${pierwszy.replace(/\s+$/, '')} ${drugi.trim()}`.trim()
 }
 
+function czyRzymskiWiersz(wiersz: WierszProgramu) {
+  return !wiersz.czyLitera && wzorzecRzymski.test(wiersz.tresc)
+}
+
+function czyLiterowyWiersz(wiersz: WierszProgramu) {
+  return rozpoznajOznaczenieProgramu(wiersz.tresc, wiersz.czyLitera)?.oznaczenie.rodzaj === 'literowe'
+}
+
 function czyZnacznikProgramu(wiersz: WierszProgramu) {
   return Boolean(
     wiersz.tresc.match(wzorzecDnia) ||
       wiersz.tresc.match(wzorzecModulu) ||
       wiersz.tresc.match(wzorzecNaglowkaMarkdown) ||
-      wiersz.tresc.match(wzorzecRzymski) ||
+      czyRzymskiWiersz(wiersz) ||
+      czyLiterowyWiersz(wiersz) ||
       wiersz.tresc.match(wzorzecArabski) ||
       wiersz.surowy.match(wzorzecPunktora),
   )
@@ -469,7 +485,7 @@ export function parsujTekstProgramu(tresc: string, opcje: { czyScalacKontynuacje
   const czyMaStrukture = wiersze.some((wiersz, indeks) =>
     wzorzecDnia.test(wiersz.tresc) || wzorzecModulu.test(wiersz.tresc) || wzorzecNaglowkaMarkdown.test(wiersz.tresc) ||
     (opcje.ustawieniaWierszy?.[wiersz.indeks]?.poziom === undefined && czyKandydatNaNaglowek(wiersz, wiersze[indeks + 1]) && Boolean(wiersze[indeks + 1]?.surowy.match(wzorzecPunktora))) ||
-    ((wzorzecRzymski.test(wiersz.tresc) || wzorzecArabski.test(wiersz.tresc)) && Boolean(wiersze[indeks + 1]?.surowy.match(wzorzecPunktora))),
+    ((czyRzymskiWiersz(wiersz) || wzorzecArabski.test(wiersz.tresc)) && Boolean(wiersze[indeks + 1]?.surowy.match(wzorzecPunktora))),
   )
 
   let aktualnyWiersz: WierszProgramu | undefined
@@ -613,7 +629,7 @@ export function parsujTekstProgramu(tresc: string, opcje: { czyScalacKontynuacje
     }
 
     if (opcje.czyZachowacWierszeListy && !czyMaStrukture) {
-      const rozpoznane = rozpoznajOznaczenieProgramu(wiersz.tresc)
+      const rozpoznane = rozpoznajOznaczenieProgramu(wiersz.tresc, wiersz.czyLitera)
       program.listaProsta.push({ id: `pozycja-${wiersz.indeks + 1}`, tresc: rozpoznane?.tresc ?? wiersz.tresc, poziom: poziomy[indeks], oznaczenie: rozpoznane?.oznaczenie, ustawienieOznaczenia: opcje.ustawieniaWierszy?.[wiersz.indeks], typ: rozpoznajTypElementu(wiersz.tresc) })
       continue
     }
@@ -640,13 +656,13 @@ export function parsujTekstProgramu(tresc: string, opcje: { czyScalacKontynuacje
       continue
     }
 
-    const oznaczenieWiersza = rozpoznajOznaczenieProgramu(wiersz.tresc)
+    const oznaczenieWiersza = rozpoznajOznaczenieProgramu(wiersz.tresc, wiersz.czyLitera)
     if (oznaczenieWiersza && ((opcje.ustawieniaWierszy?.[wiersz.indeks]?.poziom ?? wiersz.poziom) > 0 || /^\d+\.\d/.test(oznaczenieWiersza.oznaczenie.zapis) || oznaczenieWiersza.oznaczenie.rodzaj === 'literowe' || (/^[ivxlcdm]/.test(oznaczenieWiersza.oznaczenie.zapis)))) {
       dodajPodpunkt(oznaczenieWiersza.tresc, wiersz.poziom)
       continue
     }
 
-    const rzymski = wiersz.tresc.match(wzorzecRzymski)
+    const rzymski = wiersz.czyLitera ? null : wiersz.tresc.match(wzorzecRzymski)
 
     if (rzymski) {
       czyWykrytoRzymskie = true
