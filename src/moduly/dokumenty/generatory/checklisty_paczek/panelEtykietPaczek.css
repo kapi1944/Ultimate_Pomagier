@@ -79,3 +79,8 @@
 .etykieta-paczki[data-zageszczenie="maksymalny"] { gap: .6mm; font-size: 7.5pt; --odstep-wiersza: .2mm; }
 .etykieta-paczki:is([data-zageszczenie="kompakt"], [data-zageszczenie="maksymalny"]) h3 { font-size: 10pt; }
 .etykieta-paczki[data-zageszczenie="maksymalny"] .etykieta-paczki__tresc { gap: .4mm; }
+
+@media print {
+  .etykieta-paczki[data-etykieta][data-cel-druku-dokumentu] { display: flex !important; width: var(--szerokosc-druku) !important; height: var(--wysokosc-druku) !important; padding: 4mm !important; page: dokument-generatora; outline: none; margin: 0 !important; }
+  .paczki-podglad__strona:has([data-etykieta][data-cel-druku-dokumentu]) { zoom: 1 !important; }
+}

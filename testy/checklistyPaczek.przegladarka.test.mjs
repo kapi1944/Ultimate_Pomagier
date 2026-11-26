@@ -684,7 +684,7 @@ test('1.2.3: kompletowanie 30 egzemplarzy, dwie paczki, ponowienie zapisu, Pulpi
     for (const [indeks, strony] of obrazyPdf.wyniki.entries()) for (const [numer, obraz] of strony.entries()) await writeFile(`tmp/kompletowanie-pdf-${indeks}-${numer}.png`, Buffer.from(obraz.split(',')[1], 'base64'))
     assert.deepEqual(obrazyPdf.wymiary[0], obrazyPdf.wymiary[1], 'Oba tryby zachowują liczbę i wymiary stron PDF')
     // Rasterowy eksport może różnić się antyaliasingiem pojedynczej krawędzi tabeli.
-    assert.ok(obrazyPdf.roznice.every((roznica) => roznica.liczbaRoznic / roznica.liczbaPikseli < 0.001), 'Oba tryby zachowują wygląd PDF z tolerancją 0,1% pikseli')
+    assert.ok(obrazyPdf.roznice.every((roznica) => roznica.liczbaRoznic / roznica.liczbaPikseli < 0.001), `Oba tryby zachowują wygląd PDF z tolerancją 0,1% pikseli: ${JSON.stringify(obrazyPdf.roznice)}`)
     await strona.goto(adres)
     const wpisDrugiej = strona.getByRole('region', { name: 'Paczki do wysłania' }).locator('article').filter({ hasText: 'Druga przesyłka' })
     await wpisDrugiej.getByRole('button', { name: 'Otwórz checklistę', exact: true }).click()
@@ -755,6 +755,8 @@ test('checklista A4: bezpośredni druk, anulowanie, wersje i niezależny PDF', {
       window.print = () => {
         if (window.bladDruku) throw new Error('Testowy błąd drukowania')
         window.liczbaDrukow++
+        // Leniwie doładowany CSS innego generatora dodaje późniejsze, globalne @page.
+        if (!document.getElementById('obce-page-generatora')) document.head.insertAdjacentHTML('beforeend', '<style id="obce-page-generatora">@media print { @page { size: A4 portrait; margin: 0; } }</style>')
       }
       window.potwierdzeniaDruku = 0
       window.confirm = () => { window.potwierdzeniaDruku++; return window.potwierdzonoDruk === true }
@@ -810,8 +812,10 @@ test('checklista A4: bezpośredni druk, anulowanie, wersje i niezależny PDF', {
       } finally { await odczyt.destroy() }
       const pola = strony.flat()
       const tytul = pola.find((element) => element.str === 'Test wydruku A4')
-      assert.ok(Math.abs(tytul.transform[3] - 9.5) < 0.1)
-      assert.ok(pola.find((element) => element.str === 'Nazwa szkolenia:').transform[4] >= 9 * 72 / 25.4 - 1)
+      assert.ok(Math.abs(tytul.transform[3] - 9.5) < 0.1, `Rozmiar tytułu PDF: ${JSON.stringify(tytul.transform)}`)
+      const etykietaNazwy = pola.find((element) => element.str === 'Nazwa szkolenia:')
+      assert.ok(etykietaNazwy, `Brak etykiety „Nazwa szkolenia:” w PDF: ${JSON.stringify(pola.slice(0, 12).map((element) => [element.str, element.transform]))}`)
+      assert.ok(etykietaNazwy.transform[4] >= 9 * 72 / 25.4 - 1, `Etykieta „Nazwa szkolenia:” poza marginesem 9 mm: ${JSON.stringify(pola.slice(0, 12).map((element) => [element.str, element.transform]))}`)
       assert.ok(!pola.some((element) => /Pobierz PDF|Edycja checklisty|Kompletowanie paczki/.test(element.str)))
       return strony.map((tekst) => tekst.map((element) => element.str).join(' '))
     }
@@ -1021,4 +1025,80 @@ test('etykiety adaptacyjne: rzeczywiste PDF, geometria, 5–40 pozycji i trwały
     }
     throw blad
   } finally { await przegladarka.close() }
+})
+
+test('etykiety 2.1: wejście uniwersalne, systemowy druk 100 × 150 i anulowanie', { timeout: 60000 }, async () => {
+ const przegladarka = await chromium.launch({ ...opcjePrzegladarki, headless: true })
+ try {
+  const strona = await przegladarka.newPage()
+  await strona.goto(adres + '/dokumenty/checklisty-paczek?etykiety=uniwersalna')
+  await strona.getByRole('button', { name: 'Otwórz demonstrację Architekta', exact: true }).click()
+  const panel = strona.getByRole('region', { name: 'Etykiety paczek', exact: true })
+  await panel.waitFor()
+  assert.equal(await panel.getByLabel('Rodzaj etykiety', { exact: true }).inputValue(), 'uniwersalna')
+  const sciezka = strona.url()
+  await strona.reload()
+  await panel.waitFor()
+  assert.equal(strona.url(), sciezka)
+  await strona.evaluate(() => {
+   window.print = () => {
+    // Leniwie doładowany CSS innego generatora dodaje późniejsze, globalne @page.
+    document.head.insertAdjacentHTML('beforeend', '<style id="obce-page-generatora">@media print { @page { size: A4 portrait; margin: 0; } }</style>')
+    window.probaDrukuEtykiety = true
+   }
+   window.confirm = () => false
+  })
+  await panel.getByRole('button', { name: 'Drukuj etykietę', exact: true }).click()
+  await strona.waitForFunction(() => window.probaDrukuEtykiety)
+  await strona.emulateMedia({ media: 'print' })
+  const geometria = await panel.locator('[data-etykieta]').first().evaluate((element) => ({ szerokosc: getComputedStyle(element).width, padding: getComputedStyle(element).paddingLeft }))
+  assert.ok(Math.abs(parseFloat(geometria.padding) * 25.4 / 96 - 4) < .1, `Geometria etykiety w druku: ${JSON.stringify(geometria)}`)
+  const bajty = await strona.pdf({ preferCSSPageSize: true, printBackground: true })
+  const pdf = await PDFDocument.load(bajty)
+  assert.equal(pdf.getPageCount(), 1)
+  assert.ok(Math.abs(pdf.getPage(0).getWidth() * 25.4 / 72 - 100) < .2, `Szerokość strony PDF: ${pdf.getPage(0).getWidth()} pt`)
+  assert.ok(Math.abs(pdf.getPage(0).getHeight() * 25.4 / 72 - 150) < .2, `Wysokość strony PDF: ${pdf.getPage(0).getHeight()} pt`)
+  await mkdir('tmp/etykiety21', { recursive: true })
+  await writeFile('tmp/etykiety21/druk-systemowy.pdf', bajty)
+  await strona.evaluate(() => window.dispatchEvent(new Event('afterprint')))
+  await strona.emulateMedia({ media: 'screen' })
+  await strona.waitForFunction(() => !document.querySelector('[data-cel-druku-dokumentu]'))
+  assert.equal(await strona.evaluate(async () => {
+   const { pobierzChecklistyPaczek } = await import('/src/moduly/dokumenty/generatory/checklisty_paczek/rejestrChecklistPaczek.ts')
+   const dokumenty = pobierzChecklistyPaczek()
+   if (dokumenty.length !== 1) throw new Error('Powstał duplikat')
+   return dokumenty[0].daneDokumentu.historia.some((wpis) => wpis.wydrukEtykiety?.czyPotwierdzony)
+  }), false)
+ } finally { await przegladarka.close() }
+})
+
+test('etykiety 2.1: kafelek Szczegółów tworzy raz i otwiera etykiety grupy', { timeout: 60000 }, async () => {
+ const przegladarka = await chromium.launch({ ...opcjePrzegladarki, headless: true })
+ try {
+  const strona = await przegladarka.newPage()
+  await strona.goto(adres)
+  await strona.getByRole('button', { name: 'Otwórz demonstrację Architekta', exact: true }).click()
+  let identyfikator
+  for (let proba = 0; proba < 2; proba++) {
+   await strona.evaluate(async () => {
+    const React = await import('/node_modules/.vite/deps/react.js')
+    const { default: klient } = await import('/node_modules/.vite/deps/react-dom_client.js')
+    const { default: Panel } = await import('/src/moduly/zamkniete/szczegoly_organizacyjne/komponenty/PanelPrzygotowaniaDokumentow.tsx')
+    const { poczatkoweDaneFormularza, poczatkowaGrupa, poczatkowiAdresaci } = await import('/src/moduly/zamkniete/szczegoly_organizacyjne/danePoczatkowe.ts')
+    const { zapiszWersjeRobocza } = await import('/src/moduly/zamkniete/szczegoly_organizacyjne/uslugi/magazynWersjiRoboczych.ts')
+    const wersja = { id: 'etykiety21-szczegoly', dokumentId: 'etykiety21-szczegoly', wersja: 'test', etykietaWersji: 'Test', nazwa: 'Szkolenie DT4x', dataZapisu: new Date().toISOString(), autorId: 'administrator-kacper-madej', autorNazwa: 'Architekt', dane: { ...structuredClone(poczatkoweDaneFormularza), tytulSzkolenia: 'Szkolenie DT4x', organizator: 'IIST', wysylkaPaczkiDotyczy: true }, grupy: [{ ...structuredClone(poczatkowaGrupa), id: 'grupa21', nazwa: 'Grupa DT4x', liczbaUczestnikow: 12 }], adresaci: poczatkowiAdresaci, statusyPol: {} }
+    zapiszWersjeRobocza(wersja)
+    const kontener = document.createElement('div'); kontener.id = 'panel-testowy21'; document.body.append(kontener)
+    klient.createRoot(kontener).render(React.default.createElement(Panel, { wersja, otworzDokument: () => {}, poUtworzeniu: () => {} }))
+   })
+   await strona.locator('#panel-testowy21').getByRole('button', { name: 'Etykiety paczek', exact: true }).click()
+   await strona.getByRole('region', { name: 'Etykiety paczek', exact: true }).waitFor()
+   if (identyfikator) assert.equal(strona.url(), identyfikator)
+   identyfikator = strona.url()
+  }
+  assert.equal(await strona.evaluate(async () => {
+   const { pobierzChecklistyPaczek } = await import('/src/moduly/dokumenty/generatory/checklisty_paczek/rejestrChecklistPaczek.ts')
+   return pobierzChecklistyPaczek().filter((dokument) => dokument.daneDokumentu.grupaId === 'grupa21').length
+  }), 1)
+ } finally { await przegladarka.close() }
 })

@@ -32,21 +32,62 @@ export function normalizujWierszWejsciowy(wiersz: string): string {
     : '')
 }
 
+/**
+ * Jednoliterowe oznaczenia I, V, X, L, C, D, M są dwuznaczne: mogą być cyfrą rzymską albo kolejną literą listy (A. B. C. D.).
+ * Rozstrzygamy to po sekwencji: litera kontynuująca poprzednią literę lub poprzedzająca literę-następcę jest literą listy.
+ */
+export function wyznaczLiterowoscOznaczen(tresci: string[]): boolean[] {
+  const jednoliterowe = (tresc: string) => {
+    const zapis = rozpoznajOznaczenieProgramu(tresc)?.oznaczenie.zapis
+    return zapis && /^[a-z][.)]$/i.test(zapis) ? zapis.toLowerCase().charCodeAt(0) - 96 : undefined
+  }
+  let ostatniaLitera: number | undefined
+  let ostatniRzymski: number | undefined
+  return tresci.map((tresc, indeks) => {
+    const oznaczenie = rozpoznajOznaczenieProgramu(tresc)?.oznaczenie
+    if (!oznaczenie) return false
+    const litera = jednoliterowe(tresc)
+    if (litera === undefined) {
+      if (oznaczenie.rodzaj === 'arabskie') { ostatniaLitera = undefined; ostatniRzymski = undefined }
+      if (oznaczenie.rodzaj === 'rzymskie') { ostatniRzymski = oznaczenie.wartosc; ostatniaLitera = undefined }
+      return false
+    }
+    let czyLitera = oznaczenie.rodzaj !== 'rzymskie'
+    if (!czyLitera) {
+      const nastepnaLitera = tresci.slice(indeks + 1).map(jednoliterowe).find((wartosc) => wartosc !== undefined)
+      czyLitera = ostatniaLitera !== undefined && litera === ostatniaLitera + 1
+        ? true
+        : ostatniRzymski !== undefined && oznaczenie.wartosc === ostatniRzymski + 1
+          ? false
+          : nastepnaLitera === litera + 1
+    }
+    if (czyLitera) ostatniaLitera = litera
+    else { ostatniRzymski = oznaczenie.wartosc; ostatniaLitera = undefined }
+    return czyLitera
+  })
+}
+
 export function wyznaczPoziomyProgramu(wiersze: { tresc: string; poziom: number; jawnyPoziom?: number }[]) {
+  const czyLitery = wyznaczLiterowoscOznaczen(wiersze.map((wiersz) => wiersz.tresc))
+  const oznaczenia = wiersze.map((wiersz, indeks) => rozpoznajOznaczenieProgramu(wiersz.tresc, czyLitery[indeks])?.oznaczenie)
   let poziomPoprzedni = 0
   let czyNaglowek = false
   let poziomPunktuNumerowanego: number | undefined
-  return wiersze.map((wiersz) => {
-    const oznaczenie = rozpoznajOznaczenieProgramu(wiersz.tresc)?.oznaczenie
+  return wiersze.map((wiersz, indeks) => {
+    const oznaczenie = oznaczenia[indeks]
+    const czyTytulPrzedListaLiterowa = !oznaczenie && wiersz.jawnyPoziom === undefined && wiersz.poziom === 0
+      && oznaczenia[indeks + 1]?.rodzaj === 'literowe' && oznaczenia[indeks + 1]?.wartosc === 1
     let poziom = wiersz.jawnyPoziom
     if (poziom === undefined) {
-      poziom = oznaczenie ? wiersz.poziom : czyNaglowek ? poziomPoprzedni + 1 : poziomPoprzedni
+      poziom = czyTytulPrzedListaLiterowa
+        ? poziomPunktuNumerowanego ?? 0
+        : oznaczenie ? wiersz.poziom : czyNaglowek ? poziomPoprzedni + 1 : poziomPoprzedni
       poziom = Math.max(poziom, wiersz.poziom)
       if ((oznaczenie?.rodzaj === 'literowe' || oznaczenie?.rodzaj === 'punktor') && poziomPunktuNumerowanego !== undefined) {
         poziom = Math.max(poziom, poziomPunktuNumerowanego + 1)
       }
     }
-    czyNaglowek = oznaczenie?.rodzaj === 'rzymskie' || oznaczenie?.rodzaj === 'arabskie'
+    czyNaglowek = oznaczenie?.rodzaj === 'rzymskie' || oznaczenie?.rodzaj === 'arabskie' || czyTytulPrzedListaLiterowa
     if (czyNaglowek) poziomPunktuNumerowanego = poziom
     poziomPoprzedni = poziom
     return poziom
@@ -66,7 +107,7 @@ export function liczbaRzymska(liczba: number): string {
   return wynik
 }
 
-export function rozpoznajOznaczenieProgramu(tekst: string): { oznaczenie: OznaczenieProgramu; tresc: string } | null {
+export function rozpoznajOznaczenieProgramu(tekst: string, czyLitera = false): { oznaczenie: OznaczenieProgramu; tresc: string } | null {
   if (/^\s*(?:\d{1,2}\.(?:00|[0-5]\d)(?:\s*(?:[-–—]|godz\b)|\s*$)|\d{1,2}\.\d{1,2}\.\d{4}\b|\d+(?:\.\d+)*[.)]?\s+(?:min(?:ut\w*)?|godz\w*|h|s|zł|kg|%)(?=\s|[.,;:]|$))/iu.test(tekst)) return null
   const dopasowanie = tekst.match(/^(\s*)(\d+(?:\.\d+)+(?:[.)])?|\d+[.)]|[IVXLCDMivxlcdm]+[.)]|[a-zA-Z][.)]|[•◦▪·*–—-])\s+(.+)$/)
   if (!dopasowanie) return null
@@ -81,6 +122,7 @@ export function rozpoznajOznaczenieProgramu(tekst: string): { oznaczenie: Oznacz
     const liczba = cyfry.reduce((suma, cyfra, indeks) => suma + (cyfra < (cyfry[indeks + 1] ?? 0) ? -cyfra : cyfra), 0)
     if (liczbaRzymska(liczba) === rdzen.toUpperCase()) { rodzaj = 'rzymskie'; wartosc = liczba }
   }
+  if (czyLitera && /^[a-z][.)]$/i.test(zapis)) rodzaj = 'punktor'
   if (rodzaj === 'punktor' && /^[a-z][.)]$/i.test(zapis)) { rodzaj = 'literowe'; wartosc = rdzen.toLowerCase().charCodeAt(0) - 96 }
   return { oznaczenie: { zapis, rodzaj, wartosc }, tresc: dopasowanie[3] }
 }

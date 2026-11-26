@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { parsujTekstProgramu } from '../src/moduly/dokumenty/generatory/programy_szkolen/ParserTekstu.ts'
+import { wyznaczLiterowoscOznaczen, wyznaczPoziomyProgramu } from '../src/moduly/dokumenty/generatory/programy_szkolen/oznaczeniaProgramu.ts'
 import { pobierzTytulDokumentuProgramu } from '../src/moduly/dokumenty/generatory/programy_szkolen/tytulDokumentuProgramu.ts'
 
 function policzPunkty(program: ReturnType<typeof parsujTekstProgramu>) {
@@ -170,4 +171,53 @@ Wprowadzenie do szkolenia;
   assert.equal(pobierzTytulDokumentuProgramu('Zmieniony tytuł'), 'Zmieniony tytuł')
   assert.equal(JSON.stringify(program.dni), strukturaPrzedZmianaTytulu)
   assert.equal(program.dni[0].moduly[0].tytul, 'Wprowadzenie do szkolenia;')
+})
+
+const programZLiterami = [
+  '1. Otwarcie szkolenia',
+  'A. Powitanie uczestników',
+  'B. Autoprezentacja uczestników',
+  'C. Identyfikacja wyzwań',
+  'D. Wprowadzenie do warsztatu',
+  '',
+  'Wprowadzenie do zarządzania projektami',
+  'A. Projekt – definicja',
+  'B. Rodzaje projektów',
+  'C. Cykl życia projektu',
+  'D. Rola standardów',
+  'E. Czynniki',
+  'F. Kompetencje',
+  '',
+  'Inicjowanie projektu',
+  'A. Określenie celu',
+  'B. Analiza potrzeb',
+  'C. Definiowanie zakresu',
+  'D. Tworzenie konspektu',
+]
+
+sprawdz('litery C, D, I, L, M, V, X w liście A. B. C. nie są cyframi rzymskimi', () => {
+  assert.deepEqual(wyznaczLiterowoscOznaczen(['A. a', 'B. b', 'C. c', 'D. d']), [true, true, true, true])
+  assert.deepEqual(wyznaczLiterowoscOznaczen(['H. h', 'I. i', 'J. j']), [true, true, true])
+  assert.deepEqual(wyznaczLiterowoscOznaczen(['I. a', 'II. b', 'III. c', 'IV. d', 'V. e']), [false, false, false, false, false])
+})
+
+sprawdz('lista A. B. C. D. po numerowanym punkcie i tytuły bez numeru dostają poprawne poziomy', () => {
+  const wiersze = programZLiterami.filter(Boolean).map((tresc) => ({ tresc, poziom: 0 }))
+
+  assert.deepEqual(wyznaczPoziomyProgramu(wiersze), [0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1])
+})
+
+sprawdz('parser strukturalny nie robi modułów z liter C. i D.', () => {
+  const program = parsujTekstProgramu(programZLiterami.join('\n'), { czyScalacKontynuacje: false })
+  const moduly = program.dni.flatMap((dzien) => dzien.moduly)
+
+  assert.deepEqual(moduly.map((modul) => modul.podpunkty.length), [4, 6, 4])
+  assert.equal(moduly[1].tytul, 'Wprowadzenie do zarządzania projektami')
+})
+
+sprawdz('separatory wierszy Worda (U+2028, tabulator pionowy) działają jak enter', () => {
+  const tekst = programZLiterami.join('\n').replace('B. Autoprezentacja', '\u2028B. Autoprezentacja').replace('C. Identyfikacja', '\u000BC. Identyfikacja')
+  const moduly = parsujTekstProgramu(tekst, { czyScalacKontynuacje: false }).dni.flatMap((dzien) => dzien.moduly)
+
+  assert.deepEqual(moduly.map((modul) => modul.podpunkty.length), [4, 6, 4])
 })
