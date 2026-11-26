@@ -1,3 +1,44 @@
+/*
+ * Fonty wzorców dokumentów (Open Sans, licencja OFL – public/fonts/OpenSans-OFL.txt).
+ * Wariant variable z osią wdth: „Open Sans Condensed” to ta sama rodzina ustawiona na szerokość 75%,
+ * dzięki czemu podgląd, druk i drugi komputer wyglądają tak samo bez instalowania fontów w systemie.
+ */
+@font-face {
+  font-family: "Open Sans";
+  src: url("/fonts/OpenSans-Variable.ttf") format("truetype");
+  font-weight: 300 800;
+  font-stretch: 75% 100%;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Open Sans";
+  src: url("/fonts/OpenSans-Italic-Variable.ttf") format("truetype");
+  font-weight: 300 800;
+  font-stretch: 75% 100%;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Open Sans Condensed";
+  src: url("/fonts/OpenSans-Variable.ttf") format("truetype");
+  font-weight: 300 800;
+  font-stretch: 75%;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Open Sans Condensed";
+  src: url("/fonts/OpenSans-Italic-Variable.ttf") format("truetype");
+  font-weight: 300 800;
+  font-stretch: 75%;
+  font-style: italic;
+  font-display: swap;
+}
+
 .replikator-dokumentow {
   display: grid;
   gap: 18px;
@@ -534,5 +575,9 @@
     height: 297mm;
     box-shadow: none;
     page-break-after: always;
+  }
+
+  .replikator-dokumentow__kartka:last-child {
+    page-break-after: auto;
   }
 }
