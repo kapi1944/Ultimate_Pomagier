@@ -427,6 +427,40 @@ function sredniaSzerokoscZnaku(kroj: string) {
   return 0.5
 }
 
+let kontekstPomiaruTekstu: CanvasRenderingContext2D | null | undefined
+
+function pobierzKontekstPomiaru() {
+  if (kontekstPomiaruTekstu !== undefined) return kontekstPomiaruTekstu
+
+  try {
+    kontekstPomiaruTekstu = typeof document === 'undefined' ? null : document.createElement('canvas').getContext('2d')
+  } catch {
+    kontekstPomiaruTekstu = null
+  }
+
+  return kontekstPomiaruTekstu
+}
+
+/**
+ * Szerokość tekstu w mm. W przeglądarce mierzy faktyczną czcionką (`canvas.measureText`),
+ * w Node (testy) i gdy canvas jest niedostępny – szacuje średnią szerokością znaku kroju.
+ */
+export function szacujSzerokoscTekstuMm(tekst: string, kroj: string, rozmiarPt: number, pogrubienie = false) {
+  const kontekst = pobierzKontekstPomiaru()
+
+  if (kontekst && tekst) {
+    const waska = /condensed|narrow/i.test(kroj)
+
+    kontekst.font = `${pogrubienie ? 'bold ' : ''}${waska ? 'condensed ' : ''}${rozmiarPt}pt "${kroj}", sans-serif`
+
+    const szerokosc = kontekst.measureText(tekst).width
+
+    if (Number.isFinite(szerokosc) && szerokosc > 0) return szerokosc * MM_NA_PT
+  }
+
+  return tekst.length * rozmiarPt * sredniaSzerokoscZnaku(kroj) * MM_NA_PT
+}
+
 function wysokoscLiniiPt(rozmiarPt: number, kroj: string, akapit: WlasciwosciAkapitu) {
   const naturalna = rozmiarPt * wspolczynnikWysokosciLinii(kroj)
   const linia = akapit.liniaWartosc ?? 240
@@ -718,7 +752,7 @@ async function ulozAkapit(akapit: Element, y: number, stan: StanUkladu, czesc: C
     const fragmentGlowny = wiersz.fragmenty.find((fragment) => fragment.tekst.trim()) ?? wiersz.fragmenty[0]
     const rozmiar = fragmentGlowny?.wlasciwosci.rozmiarPt ?? znakAkapitu.rozmiarPt
     const kroj = fragmentGlowny?.wlasciwosci.kroj ?? znakAkapitu.kroj
-    const szerokoscTekstuMm = tekstWiersza.length * rozmiar * sredniaSzerokoscZnaku(kroj) * MM_NA_PT
+    const szerokoscTekstuMm = szacujSzerokoscTekstuMm(tekstWiersza, kroj, rozmiar, fragmentGlowny?.wlasciwosci.pogrubienie)
     const liczbaLinii = Math.max(1, Math.ceil(szerokoscTekstuMm / (indeks === 0 ? szerokoscTekstu : szerokoscDostepna)))
 
     if (indeks === 0) {

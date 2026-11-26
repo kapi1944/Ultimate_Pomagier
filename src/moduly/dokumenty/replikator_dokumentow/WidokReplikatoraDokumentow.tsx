@@ -3,6 +3,7 @@ import { uzupelnijAnalizeDokumentu } from '../../../wspolne/dokumenty/analizaDok
 import PanelKontroliJakosciDokumentu from '../../../wspolne/dokumenty/PanelKontroliJakosciDokumentu'
 import type { ProblemDokumentu } from '../../../wspolne/dokumenty/modelBlokowy'
 import {
+  BladZapisuSzablonowDokumentow,
   pobierzSzablonyDokumentowZKartoteki,
   utworzNazweSzablonuZDopiskiem,
   wykryjKonfliktNazwySzablonu,
@@ -42,11 +43,13 @@ import {
 } from './parserDocxReplikatora'
 import { importujPdfReplikatora } from './parserPdfReplikatora'
 import { polaczStatusyPlaceholderow, czyPlaceholderySaZatwierdzone } from './placeholderyReplikatora'
+import { odmienLiczbeStron, wybierzTrybPodstawienia, zastosujPlaceholderyWDokumencie } from './szablonReplikatora'
 import { opiszPoziomZgodnosci, pobierzBlokiReplikatora, utworzRaportReplikacji } from './raportReplikacji'
 import type {
   DecyzjaUzytkownikaReplikatora,
   PlaceholderReplikatora,
   SzablonRoboczyReplikatora,
+  TrybPodstawieniaPlaceholdera,
   TypDokumentuReplikatora,
   WynikImportuReplikatora,
 } from './typyReplikatora'
@@ -88,6 +91,10 @@ function opiszTypZrodla(typ: TypZrodlaDokumentu) {
   }
 
   return etykiety[typ]
+}
+
+function komunikatBleduZapisu(blad: unknown) {
+  return blad instanceof BladZapisuSzablonowDokumentow ? blad.message : 'Nie udało się zapisać szablonu. Dane w edytorze nie zostały zmienione.'
 }
 
 function pobierzRoleUzytkownika(): RolaDostepu {
@@ -427,6 +434,30 @@ export default function WidokReplikatoraDokumentow() {
     })
   }
 
+  /** Dokument zapisywany w szablonie: z tekstami zastąpionymi zatwierdzonymi placeholderami i modelem blokowym. */
+  function przygotujDokumentDoZapisu(szablonDoZapisu: SzablonRoboczyReplikatora) {
+    return zastosujPlaceholderyWDokumencie(
+      zsynchronizujDokumentPomagieraZDokumentemBlokowym(dokument, szablonDoZapisu.dokumentBlokowy),
+      szablonDoZapisu.placeholdery,
+    )
+  }
+
+  function zatwierdzWszystkiePropozycje() {
+    ustawSzablonRoboczy((obecnySzablon) => ({
+      ...obecnySzablon,
+      placeholdery: obecnySzablon.placeholdery.map((placeholder) => (placeholder.status === 'propozycja' ? { ...placeholder, status: 'zatwierdzony' as const } : placeholder)),
+    }))
+    ustawKomunikat('Zatwierdzono wszystkie propozycje placeholderów.')
+  }
+
+  function odrzucPozostalePropozycje() {
+    ustawSzablonRoboczy((obecnySzablon) => ({
+      ...obecnySzablon,
+      placeholdery: obecnySzablon.placeholdery.map((placeholder) => (placeholder.status === 'propozycja' ? { ...placeholder, status: 'odrzucony' as const } : placeholder)),
+    }))
+    ustawKomunikat('Odrzucono pozostałe propozycje placeholderów.')
+  }
+
   function zapiszNowySzablon() {
     if (!czyMoznaZapisacSzablon) {
       ustawKomunikat('Przed zapisem zatwierdź albo odrzuć wszystkie placeholdery.')
@@ -456,8 +487,15 @@ export default function WidokReplikatoraDokumentow() {
           ...szablonRoboczy,
           historiaDecyzji,
         }
-        const dokumentDoZapisu = zsynchronizujDokumentPomagieraZDokumentemBlokowym(dokument, szablonDoZapisu.dokumentBlokowy)
-        const szablon = zapiszNowaWersjeSzablonu(istniejacySzablon.id, szablonDoZapisu, dokumentDoZapisu, uzytkownik)
+        const dokumentDoZapisu = przygotujDokumentDoZapisu(szablonDoZapisu)
+        let szablon: SzablonDokumentuKartoteki
+
+        try {
+          szablon = zapiszNowaWersjeSzablonu(istniejacySzablon.id, { ...szablonDoZapisu, dokumentPodgladu: dokumentDoZapisu }, dokumentDoZapisu, uzytkownik)
+        } catch (blad) {
+          ustawKomunikat(komunikatBleduZapisu(blad))
+          return
+        }
 
         ustawSzablony(pobierzSzablonyDokumentowZKartoteki())
         ustawWybranySzablonId(szablon.id)
@@ -479,14 +517,21 @@ export default function WidokReplikatoraDokumentow() {
       historiaDecyzji,
     }
     const dokumentDoZapisu = {
-      ...zsynchronizujDokumentPomagieraZDokumentemBlokowym(dokument, szablonDoZapisuBazowy.dokumentBlokowy),
+      ...przygotujDokumentDoZapisu(szablonDoZapisuBazowy),
       nazwa: nazwaBezKonfliktu,
     }
     const szablonDoZapisu: SzablonRoboczyReplikatora = {
       ...szablonDoZapisuBazowy,
       dokumentPodgladu: dokumentDoZapisu,
     }
-    const szablon = zapiszNowySzablonZReplikatora(szablonDoZapisu, dokumentDoZapisu, uzytkownik, nazwaBezKonfliktu)
+    let szablon: SzablonDokumentuKartoteki
+
+    try {
+      szablon = zapiszNowySzablonZReplikatora(szablonDoZapisu, dokumentDoZapisu, uzytkownik, nazwaBezKonfliktu)
+    } catch (blad) {
+      ustawKomunikat(komunikatBleduZapisu(blad))
+      return
+    }
 
     ustawSzablony(pobierzSzablonyDokumentowZKartoteki())
     ustawWybranySzablonId(szablon.id)
@@ -516,12 +561,19 @@ export default function WidokReplikatoraDokumentow() {
         utworzDecyzje('zapis', `Zapisano jako nową iterację szablonu ${wybranySzablon?.nazwa ?? wybranySzablonId}.`, uzytkownik),
       ],
     }
-    const dokumentDoZapisu = zsynchronizujDokumentPomagieraZDokumentemBlokowym(dokument, szablonDoZapisuBazowy.dokumentBlokowy)
+    const dokumentDoZapisu = przygotujDokumentDoZapisu(szablonDoZapisuBazowy)
     const szablonDoZapisu: SzablonRoboczyReplikatora = {
       ...szablonDoZapisuBazowy,
       dokumentPodgladu: dokumentDoZapisu,
     }
-    const szablon = zapiszNowaWersjeSzablonu(wybranySzablonId, szablonDoZapisu, dokumentDoZapisu, uzytkownik)
+    let szablon: SzablonDokumentuKartoteki
+
+    try {
+      szablon = zapiszNowaWersjeSzablonu(wybranySzablonId, szablonDoZapisu, dokumentDoZapisu, uzytkownik)
+    } catch (blad) {
+      ustawKomunikat(komunikatBleduZapisu(blad))
+      return
+    }
 
     ustawSzablony(pobierzSzablonyDokumentowZKartoteki())
     ustawWybranySzablonId(szablon.id)
@@ -737,10 +789,24 @@ export default function WidokReplikatoraDokumentow() {
 
           <section className="replikator-dokumentow__lista">
             <h3>Placeholdery do zatwierdzenia</h3>
+            {szablonRoboczy.placeholdery.some((placeholder) => placeholder.status === 'propozycja') && (
+              <div className="replikator-dokumentow__formularz-linia">
+                <button type="button" onClick={zatwierdzWszystkiePropozycje}>Zatwierdź wszystkie propozycje</button>
+                <button type="button" onClick={odrzucPozostalePropozycje}>Odrzuć pozostałe</button>
+              </div>
+            )}
             {szablonRoboczy.placeholdery.length ? szablonRoboczy.placeholdery.map((placeholder) => (
               <div className="replikator-dokumentow__wiersz-pola" key={placeholder.id}>
                 <span>{`{{${placeholder.nazwa}}}`}</span>
                 <small>{placeholder.rodzaj} | {placeholder.powiazanie} | {placeholder.status}</small>
+                <select
+                  aria-label={`Sposób podstawienia {{${placeholder.nazwa}}}`}
+                  value={placeholder.tryb ?? wybierzTrybPodstawienia(placeholder.wartoscZrodlowa ?? '')}
+                  onChange={(zdarzenie) => aktualizujPlaceholder(placeholder.id, { tryb: zdarzenie.target.value as TrybPodstawieniaPlaceholdera })}
+                >
+                  <option value="zastap_calosc">Zastąp całość</option>
+                  <option value="etykieta_i_wartosc">Etykieta + wartość</option>
+                </select>
                 <button type="button" disabled={placeholder.status === 'zatwierdzony'} onClick={() => zatwierdzPlaceholder(placeholder.id)}>
                   Zatwierdź
                 </button>
@@ -791,7 +857,7 @@ export default function WidokReplikatoraDokumentow() {
           <div className="replikator-dokumentow__pasek">
             <div>
               <h2>Podgląd modelu</h2>
-              <span>{dokument.strony.length} stron, {raport?.liczbaTekstow ?? 0} tekstów, {raport?.liczbaTabel ?? 0} tabel</span>
+              <span>{odmienLiczbeStron(dokument.strony.length)}, {raport?.liczbaTekstow ?? 0} tekstów, {raport?.liczbaTabel ?? 0} tabel</span>
             </div>
             <span>{dokument.zrodlo.typ.toUpperCase()}</span>
           </div>

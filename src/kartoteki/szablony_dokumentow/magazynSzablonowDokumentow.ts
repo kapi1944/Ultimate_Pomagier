@@ -1,5 +1,5 @@
 import { sprawdzDokumentBlokowy, type DokumentBlokowy, type ProblemDokumentu } from '../../wspolne/dokumenty/modelBlokowy'
-import type { DokumentPomagiera } from '../../wspolne/dokumenty/typyDokumentu'
+import type { DokumentPomagiera, ElementDokumentu } from '../../wspolne/dokumenty/typyDokumentu'
 import type { SzablonRoboczyReplikatora, TypDokumentuReplikatora } from '../../moduly/dokumenty/replikator_dokumentow/typyReplikatora'
 import {
   skopiujDaneWersji,
@@ -40,6 +40,63 @@ type StarySzablonDokumentu = {
     elementyNieobslugiwane?: string[]
     historiaDecyzji?: SzablonDokumentuKartoteki['historiaDecyzji']
   }
+}
+
+/**
+ * Obraz w dokumencie podglądu trzyma źródło (base64) zarówno w elemencie, jak i w zasobie. W magazynie zapisujemy je
+ * raz – w `zasoby` – a element wskazuje je przez `zasobId` (ten sam zasób DOCX używany wielokrotnie nie jest duplikowany).
+ */
+export function kompaktujObrazyDokumentuPodgladu(dokument: DokumentPomagiera | undefined): DokumentPomagiera | undefined {
+  if (!dokument) return dokument
+
+  const zasobyZeZrodlem = new Set(dokument.zasoby.filter((zasob) => zasob.zrodlo).map((zasob) => zasob.id))
+  const przetworz = (elementy: ElementDokumentu[]): ElementDokumentu[] =>
+    elementy.map((element) => {
+      if (element.rodzaj === 'blok') return { ...element, elementy: przetworz(element.elementy) }
+      if (element.rodzaj === 'obraz' && element.zasobId && element.zrodlo && zasobyZeZrodlem.has(element.zasobId)) {
+        const bezZrodla = { ...element }
+
+        delete bezZrodla.zrodlo
+
+        return bezZrodla
+      }
+
+      return element
+    })
+
+  return { ...dokument, strony: dokument.strony.map((strona) => ({ ...strona, elementy: przetworz(strona.elementy) })) }
+}
+
+/** Odwrotność kompaktowania; starsze zapisy (z pełnym `zrodlo` w elemencie) przechodzą bez zmian. */
+export function rozwinObrazyDokumentuPodgladu(dokument: DokumentPomagiera | undefined): DokumentPomagiera | undefined {
+  if (!dokument) return dokument
+
+  const zrodla = new Map(dokument.zasoby.map((zasob) => [zasob.id, zasob.zrodlo]))
+  const przetworz = (elementy: ElementDokumentu[]): ElementDokumentu[] =>
+    elementy.map((element) => {
+      if (element.rodzaj === 'blok') return { ...element, elementy: przetworz(element.elementy) }
+      if (element.rodzaj === 'obraz' && !element.zrodlo && element.zasobId && zrodla.get(element.zasobId)) {
+        return { ...element, zrodlo: zrodla.get(element.zasobId) }
+      }
+
+      return element
+    })
+
+  return { ...dokument, strony: dokument.strony.map((strona) => ({ ...strona, elementy: przetworz(strona.elementy) })) }
+}
+
+export class BladZapisuSzablonowDokumentow extends Error {
+  readonly przyczyna: 'brak_miejsca' | 'inny'
+
+  constructor(przyczyna: 'brak_miejsca' | 'inny', komunikat: string) {
+    super(komunikat)
+    this.name = 'BladZapisuSzablonowDokumentow'
+    this.przyczyna = przyczyna
+  }
+}
+
+function czyBladBrakuMiejsca(blad: unknown) {
+  return blad instanceof Error && (blad.name === 'QuotaExceededError' || blad.name === 'NS_ERROR_DOM_QUOTA_REACHED' || /quota|pełn|brak miejsca/i.test(blad.message))
 }
 
 function normalizujNazwe(nazwa: string) {
@@ -171,7 +228,7 @@ function migrujStarySzablon(wartosc: unknown): SzablonDokumentuKartoteki | null 
     autor: daneReplikacji.uzytkownik ?? 'Architekt',
     zrodlo: daneReplikacji.zrodloImportu === 'DOCX' || daneReplikacji.zrodloImportu === 'PDF' || daneReplikacji.zrodloImportu === 'TEKST' ? daneReplikacji.zrodloImportu : 'RECZNY',
     dokumentBlokowy,
-    dokumentPodgladu: starySzablon.dokument,
+    dokumentPodgladu: rozwinObrazyDokumentuPodgladu(starySzablon.dokument),
     raportReplikacji: daneReplikacji.raportImportu,
     procentZgodnosci: daneReplikacji.procentZgodnosci ?? 0,
     poziomZgodnosci: daneReplikacji.poziomZgodnosci === 'bardzo_dobra_zgodnosc' || daneReplikacji.poziomZgodnosci === 'dobra_zgodnosc' || daneReplikacji.poziomZgodnosci === 'wymaga_sprawdzenia' ? daneReplikacji.poziomZgodnosci : 'tylko_wersja_robocza',
@@ -196,6 +253,7 @@ function uporzadkujSzablon(wartosc: unknown): SzablonDokumentuKartoteki | null {
   if (szablon?.dokumentBlokowy && Array.isArray(szablon.historiaWersji)) {
     return {
       ...szablon,
+      dokumentPodgladu: rozwinObrazyDokumentuPodgladu(szablon.dokumentPodgladu),
       dokumentBlokowy: przygotujDokumentBlokowy(szablon.dokumentBlokowy),
       status: mapujStatus(szablon.status),
       organizator: mapujOrganizatora(szablon.organizator),
@@ -227,7 +285,21 @@ export function zapiszSzablonyDokumentowWKartotece(szablony: SzablonDokumentuKar
     return
   }
 
-  localStorage.setItem(kluczMagazynuSzablonowDokumentow, JSON.stringify(szablony))
+  try {
+    localStorage.setItem(
+      kluczMagazynuSzablonowDokumentow,
+      JSON.stringify(szablony.map((szablon) => ({ ...szablon, dokumentPodgladu: kompaktujObrazyDokumentuPodgladu(szablon.dokumentPodgladu) }))),
+    )
+  } catch (blad) {
+    if (czyBladBrakuMiejsca(blad)) {
+      throw new BladZapisuSzablonowDokumentow(
+        'brak_miejsca',
+        'Nie zapisano szablonu: brakuje miejsca w pamięci przeglądarki (obrazy w szablonach są duże). Zarchiwizuj lub usuń nieużywane szablony w Kartotece i spróbuj ponownie. Dane w aplikacji nie zostały zmienione.',
+      )
+    }
+
+    throw new BladZapisuSzablonowDokumentow('inny', 'Nie udało się zapisać szablonu w pamięci przeglądarki. Dane w aplikacji nie zostały zmienione.')
+  }
 }
 
 export function pobierzSzablonDokumentuPoId(id: string) {

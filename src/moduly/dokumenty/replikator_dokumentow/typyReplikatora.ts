@@ -32,6 +32,9 @@ export type RodzajPlaceholderaReplikatora =
   | 'klient'
   | 'organizator'
 
+/** Jak zatwierdzony placeholder zastępuje treść elementu: cały tekst albo tylko wartość po etykiecie („Data:” + wartość). */
+export type TrybPodstawieniaPlaceholdera = 'zastap_calosc' | 'etykieta_i_wartosc'
+
 export type StatusPlaceholderaReplikatora = 'propozycja' | 'zatwierdzony' | 'odrzucony'
 
 export type PlaceholderReplikatora = {
@@ -43,6 +46,8 @@ export type PlaceholderReplikatora = {
   powiazanie: 'generator_szczegolow' | 'niezalezne'
   blokId?: string
   wartoscZrodlowa?: string
+  /** Brak = wybór automatyczny na podstawie treści elementu (starsze zapisy nie mają tego pola). */
+  tryb?: TrybPodstawieniaPlaceholdera
 }
 
 export type RaportReplikacji = {
