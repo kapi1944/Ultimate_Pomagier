@@ -280,7 +280,7 @@ export function utworzRaportImportu(dokument: DokumentPomagiera): RaportImportuD
 }
 
 export function uzupelnijAnalizeDokumentu(dokument: DokumentPomagiera, tekstZrodlowy = pobierzPelnyTekstDokumentu(dokument)): DokumentPomagiera {
-  const mozliwyTypDokumentu = rozpoznajTypDokumentu(tekstZrodlowy)
+  const mozliwyTypDokumentu = rozpoznajTypDokumentu(tekstZrodlowy) ?? dokument.metadane.mozliwyTypDokumentu
   const propozycjePol = zaproponujPolaDynamiczne(dokument)
   const istniejacePola = new Map(dokument.polaDynamiczne.map((pole) => [`${pole.elementId}-${pole.nazwa}`, pole]))
   const polaDynamiczne = propozycjePol.map((pole) => istniejacePola.get(`${pole.elementId}-${pole.nazwa}`) ?? pole)

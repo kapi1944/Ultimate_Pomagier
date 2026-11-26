@@ -71,6 +71,8 @@ export type StylTekstuDokumentu = {
   podkreslenie: boolean
   kolor: string
   wyrownanie: WyrownanieTekstuDokumentu
+  /** Wysokość pojedynczego wiersza w mm (interlinia z DOCX). Brak = domyślna interlinia renderera. */
+  wysokoscLiniiMm?: number
 }
 
 export type ZrodloDokumentu = {

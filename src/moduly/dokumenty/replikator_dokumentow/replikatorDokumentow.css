@@ -345,7 +345,10 @@
   position: relative;
   flex: 0 0 auto;
   width: min(100%, calc(var(--szerokosc-mm, 210) * var(--skala-mm)));
-  height: calc(var(--wysokosc-mm, 297) * var(--skala-mm));
+  /* Proporcje strony zamiast stałej wysokości – przy węższym kontenerze strona skaluje się w całości. */
+  aspect-ratio: var(--szerokosc-mm, 210) / var(--wysokosc-mm, 297);
+  /* Kontener dla jednostek cqw: rozmiary czcionek i interlinii skalują się z szerokością kartki. */
+  container-type: inline-size;
   margin: 0 auto;
   border-radius: 4px;
   background: #ffffff;
@@ -370,7 +373,10 @@
 .replikator-dokumentow__tekst {
   margin: 0;
   line-height: 1.35;
-  overflow: hidden;
+  /* Wysokość pola wynika z interlinii DOCX; ucinanie powodowało znikanie fragmentów liter. */
+  overflow: visible;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .replikator-dokumentow__tekst:focus {

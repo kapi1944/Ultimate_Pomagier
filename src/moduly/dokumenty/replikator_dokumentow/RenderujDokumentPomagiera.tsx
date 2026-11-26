@@ -29,6 +29,40 @@ function ustawPozycje(pozycja: PozycjaElementuDokumentu, strona: StronaDokumentu
   }
 }
 
+const MM_NA_PT = 25.4 / 72
+
+/**
+ * Wymiar w mm przeliczony na jednostki kontenera kartki (cqw), dzięki czemu tekst skaluje się
+ * razem z geometrią strony – niezależnie od skali podglądu i wydruku.
+ * Wcześniej rozmiar czcionki był podawany w px, co rozjeżdżało tekst względem pozycji w mm.
+ */
+function mmNaJednostkiKartki(mm: number, strona: StronaDokumentu) {
+  return `${((mm / strona.szerokoscMm) * 100).toFixed(4)}cqw`
+}
+
+function rozmiarCzcionki(pt: number, strona: StronaDokumentu) {
+  return mmNaJednostkiKartki(pt * MM_NA_PT, strona)
+}
+
+/** Stos fontów z zamiennikami – „Open Sans Condensed” zwykle nie jest zainstalowany jako osobna rodzina. */
+function stosFontow(kroj?: string) {
+  const nazwa = (kroj ?? '').trim()
+  const zamienniki: string[] = []
+  const male = nazwa.toLowerCase()
+
+  if (male.includes('open sans')) zamienniki.push('"Open Sans"')
+  if (male.includes('condensed') || male.includes('narrow')) zamienniki.push('"Arial Narrow"', '"Roboto Condensed"')
+  if (male.includes('calibri')) zamienniki.push('Carlito')
+  if (male.includes('cambria')) zamienniki.push('Caladea')
+
+  return [nazwa ? `"${nazwa}"` : '', ...zamienniki, 'Calibri', 'Arial', 'sans-serif'].filter(Boolean).join(', ')
+}
+
+function czyKrojZwezony(kroj?: string) {
+  const male = (kroj ?? '').toLowerCase()
+  return male.includes('condensed') || male.includes('narrow')
+}
+
 function czyElementTekstowy(element: ElementDokumentu): element is ElementTekstowyDokumentu {
   return element.rodzaj === 'tekst' || element.rodzaj === 'naglowek' || element.rodzaj === 'stopka'
 }
@@ -77,8 +111,8 @@ function renderujElement(
         style={{
           ...ustawPozycje(element.pozycja, strona, element.zIndex ?? 3),
           color: element.styl.kolor,
-          fontFamily: element.styl.krojCzcionki,
-          fontSize: `${element.styl.rozmiarCzcionki}px`,
+          fontFamily: stosFontow(element.styl.krojCzcionki),
+          fontSize: rozmiarCzcionki(element.styl.rozmiarCzcionki, strona),
         }}
         onClick={zaznacz}
       >
@@ -183,8 +217,10 @@ function renderujElement(
         style={{
           ...ustawPozycje(element.pozycja, strona, element.zIndex ?? 4),
           color: element.styl.kolor,
-          fontFamily: element.styl.krojCzcionki,
-          fontSize: `${element.styl.rozmiarCzcionki}px`,
+          fontFamily: stosFontow(element.styl.krojCzcionki),
+          fontStretch: czyKrojZwezony(element.styl.krojCzcionki) ? 'condensed' : undefined,
+          fontSize: rozmiarCzcionki(element.styl.rozmiarCzcionki, strona),
+          lineHeight: element.styl.wysokoscLiniiMm ? mmNaJednostkiKartki(element.styl.wysokoscLiniiMm, strona) : undefined,
           fontStyle: element.styl.kursywa ? 'italic' : 'normal',
           fontWeight: element.styl.pogrubienie ? 700 : 400,
           textAlign:

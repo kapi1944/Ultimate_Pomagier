@@ -9,10 +9,21 @@ import type {
   KomorkaTabeliDokumentu,
   RolaGrafikiDokumentu,
   StylTekstuDokumentu,
+  TypRozpoznanegoDokumentu,
   UstawieniaListyObecnosci,
   ZasobDokumentu,
 } from '../dokumenty/typyDokumentu'
 import { czytajZip } from './czytnikZip'
+import {
+  czytajUstawieniaStrony,
+  pobierzIdRelacjiCzesciSekcji,
+  ulozCzescDocx,
+  utworzKontekstStylowDocx,
+  utworzStroneUkladu,
+  zakotwiczStopke,
+  type CzescUkladuDocx,
+  type PobieranieGrafikiDocx,
+} from './ukladDocx'
 
 const nsW = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
 const nsA = 'http://schemas.openxmlformats.org/drawingml/2006/main'
@@ -977,6 +988,150 @@ async function utworzStronyOgolne(
   return strony
 }
 
+/**
+ * Uzupełniające rozpoznanie wzorów certyfikatów/dyplomów, w których słowo „Certyfikat” jest tylko grafiką.
+ * Działa wyłącznie gdy wspólne `rozpoznajTypDokumentu` nic nie rozpoznało.
+ */
+function rozpoznajTypCertyfikatuDocx(nazwaPliku: string, tekstZrodlowy: string): TypRozpoznanegoDokumentu | undefined {
+  const nazwa = normalizuj(nazwaPliku).replace(/ł/g, 'l')
+  const tekst = normalizuj(tekstZrodlowy).replace(/ł/g, 'l')
+
+  if (/certyfikat|dyplom|zaswiadczeni/.test(nazwa)) {
+    return 'certyfikat'
+  }
+
+  if (tekst.includes('imie i nazwisko') && !tekst.includes('lp.') && (tekst.includes('wykladowca') || tekst.includes('tytul szkolenia') || tekst.includes('ukonczyl'))) {
+    return 'certyfikat'
+  }
+
+  return undefined
+}
+
+function utworzPobieranieGrafiki(zip: ZipDocx, relacje: Map<string, RelacjaDocx>, zasoby: Map<string, ZasobDokumentu>): PobieranieGrafikiDocx {
+  const pamiec = new Map<string, GrafikaDocx | null>()
+
+  return async (idRelacji, rolaDomyslna) => {
+    const klucz = `${idRelacji}|${rolaDomyslna}`
+
+    if (pamiec.has(klucz)) {
+      return pamiec.get(klucz) ?? null
+    }
+
+    const relacja = relacje.get(idRelacji)
+    let grafika: GrafikaDocx | null = null
+
+    if (relacja?.cel && relacja.typ.includes('/image')) {
+      const zrodlo = await pobierzObraz(zip, relacja.cel)
+
+      if (zrodlo) {
+        // Identyfikator zasobu oparty o ścieżkę – ten sam obraz w nagłówku i treści to jeden zasób.
+        grafika = {
+          id: relacja.cel,
+          nazwa: relacja.cel.split('/').pop() ?? relacja.cel,
+          zrodlo,
+          rola: rozpoznajRoleGrafiki(relacja.cel, rolaDomyslna),
+        }
+        dodajZasob(zasoby, grafika)
+      }
+    }
+
+    pamiec.set(klucz, grafika)
+    return grafika
+  }
+}
+
+function wybierzCzescSekcji(czesci: CzescDocx[], relacje: Map<string, RelacjaDocx>, idRelacji: string | null) {
+  const sciezka = idRelacji ? relacje.get(idRelacji)?.cel : undefined
+
+  return (sciezka ? czesci.find((czesc) => czesc.sciezka === sciezka) : undefined) ?? czesci[0]
+}
+
+function sklonujElementyCzesci(elementy: ElementDokumentu[], numerStrony: number) {
+  return elementy.map((element) => ({ ...element, id: `${element.id}-s${numerStrony}` }) as ElementDokumentu)
+}
+
+/**
+ * Wierny układ dokumentów o swobodnej kompozycji (certyfikat, dyplom, zaświadczenie, karta).
+ * Geometria pochodzi z XML DOCX zamiast ze stałych pozycji – patrz `ukladDocx.ts`.
+ */
+async function utworzStronyWiernegoUkladu(
+  zip: ZipDocx,
+  body: Element,
+  relacje: Map<string, RelacjaDocx>,
+  naglowki: CzescDocx[],
+  stopki: CzescDocx[],
+  zasoby: Map<string, ZasobDokumentu>,
+) {
+  const parsuj = async (sciezka: string) => {
+    const xml = await zip.tekst(sciezka)
+    return xml ? new DOMParser().parseFromString(xml, 'application/xml') : null
+  }
+  const kontekst = utworzKontekstStylowDocx(await parsuj('word/styles.xml'), await parsuj('word/settings.xml'), await parsuj('word/theme/theme1.xml'))
+  const ustawienia = czytajUstawieniaStrony(body)
+  const ostrzezenia: string[] = []
+  const utworzTabele = (tabela: Element, y: number, x: number, szerokosc: number) => {
+    const element = utworzTabeleZXml(`tabela-${y.toFixed(1)}`, y, tabela)
+    element.pozycja.x = x
+    element.pozycja.szerokosc = szerokosc
+    element.status = 'niepewny'
+    return element
+  }
+  const ulozCzescPomocnicza = async (czesc: CzescDocx | undefined, typ: 'header' | 'footer') => {
+    if (!czesc) {
+      return { elementy: [] as ElementDokumentu[], dolMm: 0, wysokoscMm: 0 }
+    }
+
+    const wezelTresci = czesc.dokument.documentElement
+    const czescUkladu: CzescUkladuDocx = { wezelTresci, pobierzGrafike: utworzPobieranieGrafiki(zip, czesc.relacje, zasoby) }
+    const yStartu = typ === 'header' ? ustawienia.odlegloscNaglowkaMm : 0
+    const { strony } = await ulozCzescDocx(czescUkladu, {
+      strona: ustawienia,
+      kontekst,
+      rodzajTekstu: typ === 'header' ? 'naglowek' : 'stopka',
+      prefiksId: typ === 'header' ? 'naglowek-' : 'stopka-',
+      rolaGrafik: typ === 'header' ? 'logotyp_projektowy' : 'logo',
+      yStartu,
+      utworzTabele,
+    })
+    const wynik = strony[0]
+    ostrzezenia.push(...wynik.ostrzezenia)
+
+    if (typ === 'footer') {
+      return { elementy: zakotwiczStopke(wynik, ustawienia, yStartu), dolMm: 0, wysokoscMm: wynik.y - yStartu }
+    }
+
+    return { elementy: wynik.elementy, dolMm: wynik.y, wysokoscMm: wynik.y - yStartu }
+  }
+
+  const naglowek = await ulozCzescPomocnicza(wybierzCzescSekcji(naglowki, relacje, pobierzIdRelacjiCzesciSekcji(body, 'header')), 'header')
+  const stopka = await ulozCzescPomocnicza(wybierzCzescSekcji(stopki, relacje, pobierzIdRelacjiCzesciSekcji(body, 'footer')), 'footer')
+  const yStartuTresci = Math.max(ustawienia.marginesGornyMm, naglowek.dolMm)
+  const dolnaGranica = ustawienia.wysokoscMm - Math.max(ustawienia.marginesDolnyMm, ustawienia.odlegloscStopkiMm + stopka.wysokoscMm)
+  const { strony: stronyTresci } = await ulozCzescDocx(
+    { wezelTresci: body, pobierzGrafike: utworzPobieranieGrafiki(zip, relacje, zasoby) },
+    {
+      strona: ustawienia,
+      kontekst,
+      rodzajTekstu: 'tekst',
+      prefiksId: '',
+      rolaGrafik: 'dekoracja',
+      yStartu: yStartuTresci,
+      dolnaGranicaMm: dolnaGranica,
+      utworzTabele,
+    },
+  )
+
+  stronyTresci.forEach((strona) => ostrzezenia.push(...strona.ostrzezenia))
+
+  const strony = stronyTresci.map((strona, indeks) => utworzStroneUkladu(indeks + 1, ustawienia, [
+    ...sklonujElementyCzesci(naglowek.elementy, indeks + 1),
+    ...strona.elementy,
+    ...sklonujElementyCzesci(stopka.elementy, indeks + 1),
+  ]))
+
+  return { strony, ostrzezenia: Array.from(new Set(ostrzezenia)) }
+}
+
 export async function importujDokumentDocx(plik: File): Promise<DokumentPomagiera> {
   const zip = await czytajZip(await plik.arrayBuffer())
   const xml = await zip.tekst('word/document.xml')
@@ -1020,20 +1175,34 @@ export async function importujDokumentDocx(plik: File): Promise<DokumentPomagier
     ...teksty,
     ...tekstyStopki,
   ].join('\n')
-  const typDokumentu = rozpoznajTypDokumentu(tekstZrodlowy)
+  const typDokumentu = rozpoznajTypDokumentu(tekstZrodlowy) ?? rozpoznajTypCertyfikatuDocx(plik.name, tekstZrodlowy)
   const podgladHtml = await utworzPodgladHtml(zip, dokumentXml, relacje, naglowki, stopki)
-
-  grafikiNaglowka.forEach((grafika) => dodajZasob(zasoby, grafika))
-  grafikiStopki.forEach((grafika) => dodajZasob(zasoby, grafika))
-  grafikiBody.forEach((grafika) => dodajZasob(zasoby, grafika))
 
   const wynikListy = typDokumentu === 'lista_obecnosci' && tabele[0]
     ? utworzStronyListyObecnosci(teksty, grafikiNaglowka[0], grafikiBody[0], pobierzWierszeTabeli(tabele[0]))
     : null
+  // Programy szkoleń mają własny pipeline (paginacja, numeracja punktów) – zostają na układzie przepływowym.
+  // Pozostałe dokumenty (certyfikaty, dyplomy, karty…) odtwarzamy wiernie z geometrii DOCX.
+  // Dopóki wierny układ nie obsługuje numeracji (w:numPr), cieniowania i pól tekstowych, dokumenty
+  // wyglądające na program (także nierozpoznane formalnie) zostają na starej ścieżce.
+  const czyWygladaNaProgram = typDokumentu === 'program_szkolenia' || normalizuj(tekstZrodlowy).includes('program szkolenia')
+  const wiernyUklad = !wynikListy && !czyWygladaNaProgram
+    ? await utworzStronyWiernegoUkladu(zip, body, relacje, naglowki, stopki, zasoby)
+    : null
+
+  if (!wiernyUklad) {
+    grafikiNaglowka.forEach((grafika) => dodajZasob(zasoby, grafika))
+    grafikiStopki.forEach((grafika) => dodajZasob(zasoby, grafika))
+    grafikiBody.forEach((grafika) => dodajZasob(zasoby, grafika))
+  }
+
   const strony = wynikListy
     ? wynikListy.strony
-    : await utworzStronyOgolne(zip, body, relacje, tekstyNaglowka, grafikiNaglowka, tekstyStopki, grafikiStopki, zasoby)
+    : wiernyUklad
+      ? wiernyUklad.strony
+      : await utworzStronyOgolne(zip, body, relacje, tekstyNaglowka, grafikiNaglowka, tekstyStopki, grafikiStopki, zasoby)
   const ostrzezenia = [
+    ...(wiernyUklad?.ostrzezenia ?? []),
     ...(wynikListy?.ustawieniaListy.liczbaKolumnPodpisu && wynikListy.ustawieniaListy.liczbaKolumnPodpisu > 3
       ? ['Dla 4-5 dni sugerowany jest układ poziomy albo ręczna korekta szerokości kolumn podpisu.']
       : []),
@@ -1069,6 +1238,7 @@ export async function importujDokumentDocx(plik: File): Promise<DokumentPomagier
         kolorDodatkowy: '#dc2626',
       },
       ustawieniaListyObecnosci: wynikListy?.ustawieniaListy,
+      mozliwyTypDokumentu: typDokumentu,
       ostrzezenia,
     },
   }
