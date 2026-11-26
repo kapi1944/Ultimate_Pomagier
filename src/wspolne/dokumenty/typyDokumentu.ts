@@ -273,6 +273,10 @@ export type MetadaneDokumentu = {
   branding: BrandingDokumentu
   ustawieniaListyObecnosci?: UstawieniaListyObecnosci
   ostrzezenia: string[]
+  /** Skąd pochodzi geometria elementów: z XML źródła (wierny układ) albo z wartości domyślnych importera. Brak = nieznane (starsze zapisy). */
+  zrodloGeometrii?: 'xml' | 'domyslna'
+  /** Konstrukcje DOCX obecne w źródle, których silnik układu jeszcze nie odtwarza (etykieta → liczba wystąpień). */
+  nieobsluzoneWezlyDocx?: Record<string, number>
 }
 
 export type DokumentPomagiera = {

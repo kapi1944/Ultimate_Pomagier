@@ -928,3 +928,29 @@ export function utworzStroneUkladu(numer: number, ustawienia: UstawieniaStronyDo
     elementy,
   }
 }
+
+/**
+ * Zlicza konstrukcje, których wierny układ jeszcze nie odtwarza (lista na podstawie Kroku 4 planu rozwoju silnika).
+ * Wynik trafia do raportu zgodności, żeby brakujące elementy były wskazane z nazwy, a nie ukryte w jednym procencie.
+ */
+export function zliczNieobsluzoneWezlyDocx(body: Element): Record<string, number> {
+  const policz = (nazwa: string, warunek?: (wezel: Element) => boolean) => {
+    const wezly = Array.from(body.getElementsByTagNameNS('*', nazwa))
+
+    return warunek ? wezly.filter(warunek).length : wezly.length
+  }
+  const wPPr = (wezel: Element) => wezel.parentNode?.nodeName.endsWith('pPr') ?? false
+  const wyniki: Record<string, number> = {
+    'pola tekstowe (txbx)': policz('txbxContent'),
+    'obiekty VML (pict)': policz('pict'),
+    'kształty DrawingML (wsp)': policz('wsp'),
+    'numeracja i punktory (numPr)': policz('numPr'),
+    'ramki tekstowe (framePr)': policz('framePr'),
+    'obramowania akapitów (pBdr)': policz('pBdr'),
+    'cieniowanie akapitów (shd)': policz('shd', wPPr),
+    'zawijanie tekstu wokół obrazów (wrap)': ['wrapSquare', 'wrapTight', 'wrapThrough', 'wrapTopAndBottom'].reduce((suma, nazwa) => suma + policz(nazwa), 0),
+    'dodatkowe sekcje (sectPr w akapicie)': policz('sectPr', wPPr),
+  }
+
+  return Object.fromEntries(Object.entries(wyniki).filter(([, liczba]) => liczba > 0))
+}

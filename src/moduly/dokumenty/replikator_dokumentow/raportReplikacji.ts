@@ -1,3 +1,5 @@
+import type { DokumentPomagiera } from '../../../wspolne/dokumenty/typyDokumentu'
+import { policzMiareStrukturalna } from './miaraStrukturalna'
 import { sprawdzDokumentBlokowy, type BlokDokumentu, type DokumentBlokowy, type ProblemDokumentu, type TypBlokuDokumentu } from '../../../wspolne/dokumenty/modelBlokowy'
 import type {
   PoziomZgodnosciReplikatora,
@@ -90,10 +92,15 @@ export function utworzRaportReplikacji(
   dokument: DokumentBlokowy,
   zrodloImportu: ZrodloImportuReplikatora,
   ograniczenia: string[] = [],
+  dokumentPodgladu?: DokumentPomagiera,
 ): RaportReplikacji {
   const statystyki = policzBlokiReplikatora(dokument)
   const bloki = splaszczBloki(dokument.struktura)
-  const procentZgodnosci = policzZgodnoscReplikacji(dokument, zrodloImportu, ograniczenia)
+  const procentHeurystyczny = policzZgodnoscReplikacji(dokument, zrodloImportu, ograniczenia)
+  // Dla dokumentów z geometrią (DOCX) wynik nie może być wyższy niż miara strukturalna:
+  // kolizje tekstów, nieodtworzone konstrukcje i geometria spoza XML obniżają zgodność.
+  const miara = dokumentPodgladu && zrodloImportu === 'DOCX' ? policzMiareStrukturalna(dokumentPodgladu) : null
+  const procentZgodnosci = miara ? Math.min(procentHeurystyczny, miara.procent) : procentHeurystyczny
   const problemyModelu = sprawdzDokumentBlokowy(dokument)
   const problemyReplikacji = bloki.flatMap((blok, indeks) => {
     if (blok.typ === 'ElementNieobslugiwany') {
@@ -122,6 +129,7 @@ export function utworzRaportReplikacji(
   const wymagaPoprawy = [
     ...(statystyki.ElementNiepewny ? [`elementy niepewne: ${statystyki.ElementNiepewny}`] : []),
     ...(procentZgodnosci <= 80 ? ['wynik zgodności wymaga ręcznej kontroli'] : []),
+    ...(miara?.elementyDoPoprawy ?? []),
   ]
 
   return {
@@ -134,7 +142,9 @@ export function utworzRaportReplikacji(
     ograniczenia,
     procentZgodnosci,
     poziomZgodnosci: klasyfikujPoziomZgodnosci(procentZgodnosci),
-    opisHeurystyki: 'Wynik jest heurystyką: start 100%, kary za PDF, elementy niepewne, elementy nieobsługiwane i jawnie zapisane ograniczenia importu. To nie jest porównanie piksel do piksela.',
+    opisHeurystyki: miara
+      ? `Wynik = mniejsza z dwóch ocen. Heurystyka (${procentHeurystyczny}%): kary za elementy niepewne, nieobsługiwane i ograniczenia importu. Miara strukturalna (${miara.procent}%): geometria z XML ${miara.odsetekGeometriiZXml}% elementów, nieodtworzone konstrukcje DOCX: ${miara.liczbaNieobsluzonychWezlow}, kolizje tekstów: ${miara.kolizje.length}. To nie jest porównanie piksel do piksela.`
+      : 'Wynik jest heurystyką: start 100%, kary za PDF, elementy niepewne, elementy nieobsługiwane i jawnie zapisane ograniczenia importu. To nie jest porównanie piksel do piksela.',
     problemyJakosci: [...problemyModelu, ...problemyReplikacji],
   }
 }

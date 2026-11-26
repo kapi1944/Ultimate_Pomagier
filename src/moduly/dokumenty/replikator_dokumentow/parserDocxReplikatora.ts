@@ -260,7 +260,7 @@ export function utworzSzablonRoboczyZDokumentu(
 ): SzablonRoboczyReplikatora {
   const typDokumentu = mapujTypDokumentu(dokument.metadane.mozliwyTypDokumentu)
   const dokumentBlokowy = utworzDokumentBlokowyZDokumentuPomagiera(dokument, typDokumentu)
-  const raportImportu = utworzRaportReplikacji(dokumentBlokowy, zrodloImportu, ograniczenia)
+  const raportImportu = utworzRaportReplikacji(dokumentBlokowy, zrodloImportu, ograniczenia, dokument)
   const bloki = pobierzBlokiReplikatora(dokumentBlokowy)
   const placeholdery = wykryjPlaceholderyReplikatora(dokumentBlokowy)
 

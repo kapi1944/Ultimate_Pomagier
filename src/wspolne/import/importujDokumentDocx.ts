@@ -21,6 +21,7 @@ import {
   utworzKontekstStylowDocx,
   utworzStroneUkladu,
   zakotwiczStopke,
+  zliczNieobsluzoneWezlyDocx,
   type CzescUkladuDocx,
   type PobieranieGrafikiDocx,
 } from './ukladDocx'
@@ -1240,6 +1241,8 @@ export async function importujDokumentDocx(plik: File): Promise<DokumentPomagier
       ustawieniaListyObecnosci: wynikListy?.ustawieniaListy,
       mozliwyTypDokumentu: typDokumentu,
       ostrzezenia,
+      zrodloGeometrii: wiernyUklad ? 'xml' : 'domyslna',
+      nieobsluzoneWezlyDocx: zliczNieobsluzoneWezlyDocx(body),
     },
   }
 

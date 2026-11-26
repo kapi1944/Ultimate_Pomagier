@@ -1,4 +1,6 @@
 import { useMemo, useState, type ChangeEvent } from 'react'
+import { pobierzSzczegolyDoGeneratorow, zbudujKontekstZeSzczegolow } from '../../../wspolne/integracje/szczegolyDoDokumentow'
+import { zbudujDaneSeryjnychDyplomow } from '../generatory/dyplomy/modelSeryjnychDyplomow'
 import { uzupelnijAnalizeDokumentu } from '../../../wspolne/dokumenty/analizaDokumentu'
 import PanelKontroliJakosciDokumentu from '../../../wspolne/dokumenty/PanelKontroliJakosciDokumentu'
 import type { ProblemDokumentu } from '../../../wspolne/dokumenty/modelBlokowy'
@@ -43,7 +45,7 @@ import {
 } from './parserDocxReplikatora'
 import { importujPdfReplikatora } from './parserPdfReplikatora'
 import { polaczStatusyPlaceholderow, czyPlaceholderySaZatwierdzone } from './placeholderyReplikatora'
-import { odmienLiczbeStron, wybierzTrybPodstawienia, zastosujPlaceholderyWDokumencie } from './szablonReplikatora'
+import { odmienLiczbeStron, wybierzTrybPodstawienia, wygenerujDokumentyZSzablonu, zastosujPlaceholderyWDokumencie } from './szablonReplikatora'
 import { opiszPoziomZgodnosci, pobierzBlokiReplikatora, utworzRaportReplikacji } from './raportReplikacji'
 import type {
   DecyzjaUzytkownikaReplikatora,
@@ -253,6 +255,11 @@ export default function WidokReplikatoraDokumentow() {
   const [wybranySzablonId, ustawWybranySzablonId] = useState('')
   const [ostatnioWybranyPlik, ustawOstatnioWybranyPlik] = useState<File | null>(null)
   const [komentarzNiskiejZgodnosci, ustawKomentarzNiskiejZgodnosci] = useState('')
+  const [szczegolyDoGenerowania] = useState(pobierzSzczegolyDoGeneratorow)
+  const [szczegolyGenerowaniaId, ustawSzczegolyGenerowaniaId] = useState('')
+  const [grupaGenerowaniaId, ustawGrupeGenerowaniaId] = useState('')
+  const [wygenerowaneDokumenty, ustawWygenerowaneDokumenty] = useState<ReturnType<typeof wygenerujDokumentyZSzablonu>>([])
+  const [indeksWygenerowanego, ustawIndeksWygenerowanego] = useState(0)
 
   const raport = dokument.metadane.raportImportu
   const raportReplikacji = szablonRoboczy.raportImportu
@@ -442,6 +449,34 @@ export default function WidokReplikatoraDokumentow() {
     )
   }
 
+  const wybraneSzczegolyGenerowania = szczegolyDoGenerowania.find((pozycja) => pozycja.id === szczegolyGenerowaniaId) ?? null
+  const grupyGenerowania = useMemo(
+    () => (wybraneSzczegolyGenerowania ? zbudujKontekstZeSzczegolow(wybraneSzczegolyGenerowania.zrodloKontekstu).grupy : []),
+    [wybraneSzczegolyGenerowania],
+  )
+
+  function wygenerujZeSzczegolow() {
+    if (!wybraneSzczegolyGenerowania || !grupaGenerowaniaId) {
+      ustawKomunikat('Wybierz szkolenie i grupę, aby wygenerować dokumenty z szablonu.')
+      return
+    }
+
+    const dane = zbudujDaneSeryjnychDyplomow(zbudujKontekstZeSzczegolow(wybraneSzczegolyGenerowania.zrodloKontekstu), grupaGenerowaniaId)
+    const szablonZrodlowy = szablony.find((szablon) => szablon.id === wybranySzablonId)
+    const dokumentSzablonu = szablonZrodlowy?.dokumentPodgladu ?? przygotujDokumentDoZapisu(szablonRoboczy)
+
+    if (!dane) {
+      ustawKomunikat('Nie znaleziono danych wybranej grupy.')
+      return
+    }
+
+    const wyniki = wygenerujDokumentyZSzablonu(dokumentSzablonu, dane, dane.uczestnicy)
+
+    ustawWygenerowaneDokumenty(wyniki)
+    ustawIndeksWygenerowanego(0)
+    ustawKomunikat(`Wygenerowano ${wyniki.length} dokument(ów) z szablonu „${szablonZrodlowy?.nazwa ?? 'bieżący import'}”, po jednym na uczestnika.`)
+  }
+
   function zatwierdzWszystkiePropozycje() {
     ustawSzablonRoboczy((obecnySzablon) => ({
       ...obecnySzablon,
@@ -585,7 +620,7 @@ export default function WidokReplikatoraDokumentow() {
   function obsluzZmianeTypuDokumentu(typDokumentu: TypDokumentuReplikatora) {
     ustawSzablonRoboczy((obecnySzablon) => {
       const dokumentBlokowy = ustawTypDokumentuBlokowego(obecnySzablon.dokumentBlokowy, typDokumentu)
-      const raportImportu = utworzRaportReplikacji(dokumentBlokowy, obecnySzablon.zrodloImportu, obecnySzablon.raportImportu.ograniczenia)
+      const raportImportu = utworzRaportReplikacji(dokumentBlokowy, obecnySzablon.zrodloImportu, obecnySzablon.raportImportu.ograniczenia, obecnySzablon.dokumentPodgladu)
 
       return {
         ...obecnySzablon,
@@ -657,7 +692,7 @@ export default function WidokReplikatoraDokumentow() {
           aktualizujElement(elementId, (element) => (czyElementTekstowy(element) ? { ...element, tekst } : element))
           ustawSzablonRoboczy((obecnySzablon) => {
             const dokumentBlokowy = aktualizujDokumentBlokowyTekstem(obecnySzablon.dokumentBlokowy, elementId, tekst)
-            const raportImportu = utworzRaportReplikacji(dokumentBlokowy, obecnySzablon.zrodloImportu, obecnySzablon.raportImportu.ograniczenia)
+            const raportImportu = utworzRaportReplikacji(dokumentBlokowy, obecnySzablon.zrodloImportu, obecnySzablon.raportImportu.ograniczenia, obecnySzablon.dokumentPodgladu)
 
             return {
               ...obecnySzablon,
@@ -888,6 +923,33 @@ export default function WidokReplikatoraDokumentow() {
               {renderujStrony()}
             </div>
           ) : renderujStrony()}
+
+          <section className="replikator-dokumentow__lista">
+            <h3>Generowanie ze Szczegółów organizacyjnych</h3>
+            <p>Źródło szablonu: wybrany zapisany szablon albo bieżący import. Dla każdego uczestnika powstaje osobny dokument.</p>
+            <div className="replikator-dokumentow__formularz-linia">
+              <select aria-label="Szczegóły organizacyjne" value={szczegolyGenerowaniaId} onChange={(zdarzenie) => { ustawSzczegolyGenerowaniaId(zdarzenie.target.value); ustawGrupeGenerowaniaId('') }}>
+                <option value="">Wybierz szkolenie</option>
+                {szczegolyDoGenerowania.map((pozycja) => <option key={pozycja.id} value={pozycja.id}>{pozycja.nazwa}{pozycja.czyKopiaRobocza ? ' (kopia robocza)' : ''}</option>)}
+              </select>
+              <select aria-label="Grupa" value={grupaGenerowaniaId} disabled={!grupyGenerowania.length} onChange={(zdarzenie) => ustawGrupeGenerowaniaId(zdarzenie.target.value)}>
+                <option value="">Wybierz grupę</option>
+                {grupyGenerowania.map((grupa) => <option key={grupa.id} value={grupa.id}>{grupa.nazwa}</option>)}
+              </select>
+              <button type="button" disabled={!grupaGenerowaniaId} onClick={wygenerujZeSzczegolow}>Wygeneruj dokumenty</button>
+            </div>
+            {wygenerowaneDokumenty.length > 0 && (
+              <>
+                <label className="replikator-dokumentow__pole">
+                  Uczestnik
+                  <select value={indeksWygenerowanego} onChange={(zdarzenie) => ustawIndeksWygenerowanego(Number(zdarzenie.target.value))}>
+                    {wygenerowaneDokumenty.map((wynik, indeks) => <option key={wynik.dokument.id} value={indeks}>{wynik.uczestnik || 'Wzór bez uczestnika'}</option>)}
+                  </select>
+                </label>
+                <RenderujDokumentPomagiera dokument={wygenerowaneDokumenty[Math.min(indeksWygenerowanego, wygenerowaneDokumenty.length - 1)].dokument} />
+              </>
+            )}
+          </section>
 
           <section className="replikator-dokumentow__wlasciwosci">
             <h3>Właściwości elementu</h3>
