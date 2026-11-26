@@ -672,8 +672,16 @@ test('1.2.3: kompletowanie 30 egzemplarzy, dwie paczki, ponowienie zapisu, Pulpi
       const roznice = piksele[0].map((pierwszy, indeks) => {
         const drugi = piksele[1][indeks]
         let liczbaRoznic = 0
+        const szerokosc = pierwszy.width
+        const czyRozny = (piksel, przesuniecie) => {
+          const drugiPiksel = piksel + przesuniecie * 4
+          if (drugiPiksel < 0 || drugiPiksel >= drugi.data.length) return true
+          return [0, 1, 2].some((kanal) => Math.abs(pierwszy.data[piksel + kanal] - drugi.data[drugiPiksel + kanal]) > 10)
+        }
+        // Raster może przesunąć pojedynczą krawędź tabeli o 1 px (subpikselowe położenie podglądu w trybie).
+        // Różnicą jest dopiero piksel bez odpowiednika w tym samym miejscu ani w sąsiednim wierszu/kolumnie.
         for (let piksel = 0; piksel < pierwszy.data.length; piksel += 4) {
-          if ([0, 1, 2].some((kanal) => Math.abs(pierwszy.data[piksel + kanal] - drugi.data[piksel + kanal]) > 10)) {
+          if ([0, szerokosc, -szerokosc, 1, -1].every((przesuniecie) => czyRozny(piksel, przesuniecie))) {
             liczbaRoznic++
           }
         }
