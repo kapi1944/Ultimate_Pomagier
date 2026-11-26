@@ -1,3 +1,8 @@
+import { zapiszOtwartyWynik, type WynikWyszukiwania } from '../wyszukiwanie/mechanizmWyszukiwania'
+import { wyszukiwarkaGlobalna } from '../wyszukiwanie/zrodlaWyszukiwania'
+import { repozytoriumWspolnychDokumentow } from '../../wspolne/dokumenty/rejestrDokumentow'
+import { czyJestPracownikiemWewnetrznym } from '../../kartoteki/uzytkownicy/typyUzytkownikow'
+import { pobierzZalogowanegoUzytkownika } from '../logowanie/sesjaUzytkownika'
 import { czyWidokZakupow, trasyZakupow, pobierzSciezkeZakupow, pobierzWidokZakupowZeSciezki } from '../nawigacja/konfiguracjaZakupow'
 import { Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { isTauri } from '@tauri-apps/api/core'
@@ -44,6 +49,7 @@ const kluczAktywnegoWidoku = 'ultimate-pomagier-aktywny-widok'
 
 
 type OpcjeZmianyWidoku = {
+  parametry?: string
   zachowajKopieProgramu?: boolean
   zachowajKopieSzczegolow?: boolean
   pomijajOstrzezenie?: boolean
@@ -110,6 +116,9 @@ function pobierzPoczatkowyWidok(): WidokNawigacji {
       return widokZeSciezki
     }
 
+    const stanWidoku = window.history.state?.widok
+    const parametry = new URLSearchParams(window.location.search)
+    if ((parametry.has('rekord') || parametry.has('akcja')) && czyWidokNawigacji(stanWidoku) && czyJestPracownikiemWewnetrznym(pobierzZalogowanegoUzytkownika())) return stanWidoku
     return 'pulpit'
   } catch {
     return 'pulpit'
@@ -377,6 +386,7 @@ export default function UkladAplikacji() {
   const [aktywnyWidok, ustawAktywnyWidok] = useState<WidokNawigacji>(pobierzPoczatkowyWidok)
   const [uzytkownikIdProfilu, ustawUzytkownikIdProfilu] = useState<string | null>(pobierzIdProfiluZeSciezki)
   const [stanMenu, ustawStanMenu] = useState({ czyPrzypiete: false, czyOtwarte: false })
+  const [wersjaWynikuWyszukiwania, ustawWersjeWynikuWyszukiwania] = useState(0)
   const [wersjaProgramu, ustawWersjeProgramu] = useState(0)
   const [wersjaFormularzaSzczegolow, ustawWersjeFormularzaSzczegolow] = useState(pobierzPoczatkowaWersjeFormularzaSzczegolow)
   const [czyOczekujeNaDecyzje, ustawCzyOczekujeNaDecyzje] = useState(false)
@@ -421,7 +431,8 @@ export default function UkladAplikacji() {
       ustawWersjeFormularzaSzczegolow((obecna) => obecna + 1)
     }
 
-    const sciezka = widok === 'profil_uzytkownika' ? opcje.uzytkownikId ? `/profil/${encodeURIComponent(opcje.uzytkownikId)}` : '/profil' : pobierzSciezkeZakupow(widok) ?? pobierzSciezkeNarzedzia(widok) ?? pobierzSciezkeGeneratora(widok) ?? '/'
+    const sciezkaBazowa = widok === 'profil_uzytkownika' ? opcje.uzytkownikId ? `/profil/${encodeURIComponent(opcje.uzytkownikId)}` : '/profil' : pobierzSciezkeZakupow(widok) ?? pobierzSciezkeNarzedzia(widok) ?? pobierzSciezkeGeneratora(widok) ?? '/'
+    const sciezka = sciezkaBazowa + (opcje.parametry ? `?${opcje.parametry}` : '')
     const stanHistorii: { widok: WidokNawigacji; szczegolyInstancjiId?: string; szczegolyKopiaId?: string } = { widok }
     if (widok === 'zamkniete_szczegoly_organizacyjne_nowe') {
       stanHistorii.szczegolyInstancjiId = pobierzIdInstancjiSzczegolow()
@@ -453,7 +464,7 @@ export default function UkladAplikacji() {
     const obecnyProfilId = uzytkownikIdProfilu ?? zalogowanyUzytkownik?.id ?? null
     const docelowyProfilId = opcje.uzytkownikId ?? zalogowanyUzytkownik?.id ?? null
     const czyZmianaProfilu = widok === 'profil_uzytkownika' && obecnyProfilId !== docelowyProfilId
-    const czyZmianaWymagaPotwierdzenia = widok !== aktywnyWidok || czyToNowyProgram || czyToNoweSzczegoly || czyZmianaProfilu
+    const czyZmianaWymagaPotwierdzenia = opcje.parametry !== undefined || widok !== aktywnyWidok || czyToNowyProgram || czyToNoweSzczegoly || czyZmianaProfilu
 
     if (!opcje.pomijajOstrzezenie && czyZmianaWymagaPotwierdzenia && (czyDokumentMaNiezapisaneZmiany() || czyTrwaZapisDokumentu())) {
       poprosODecyzjePrzedNawigacja(() => wykonajZmianeWidoku(widok, opcje))
@@ -599,6 +610,36 @@ export default function UkladAplikacji() {
     }
   }
 
+  async function otworzWynikWyszukiwania(wynik: WynikWyszukiwania) {
+    if (oczekujacaNawigacja.current || czyTrwaDecyzja.current) return false
+    async function znajdzAktualny() {
+      const konto = pobierzZalogowanegoUzytkownika()
+      if (!konto) return null
+      return wyszukiwarkaGlobalna.znajdzPoId(wynik.id, { uzytkownik: konto, sygnal: new AbortController().signal })
+    }
+    if (!await znajdzAktualny()) return false
+    const nawiguj = async () => {
+      const aktualny = await znajdzAktualny()
+      if (!aktualny) throw new Error('Rekord nie jest już dostępny.')
+      const cel = aktualny.cel
+      if (cel.dokumentId) {
+        const dokument = repozytoriumWspolnychDokumentow.pobierzPoId(cel.dokumentId)
+        if (!dokument) throw new Error('Dokument nie jest już dostępny.')
+        wykonajOtwarcieDokumentu(dokument)
+      } else {
+        const parametry = new URLSearchParams()
+        if (cel.rekordId) parametry.set('rekord', cel.rekordId)
+        if (cel.akcja) parametry.set('akcja', cel.akcja)
+        wykonajZmianeWidoku(cel.widok, { parametry: parametry.toString() })
+      }
+      ustawWersjeWynikuWyszukiwania((wersja) => wersja + 1)
+      if (!zapiszOtwartyWynik(uzytkownikId, aktualny.id)) ustawBladPreferencji('Otwarto wynik, ale nie udało się zapisać historii wyszukiwania.')
+    }
+    if (czyDokumentMaNiezapisaneZmiany() || czyTrwaZapisDokumentu()) poprosODecyzjePrzedNawigacja(nawiguj)
+    else await nawiguj()
+    return true
+  }
+
   function otworzDokument(dokument: Dokument<unknown, unknown>) {
     if (oczekujacaNawigacja.current || czyTrwaDecyzja.current) return
     if (czyDokumentMaNiezapisaneZmiany() || czyTrwaZapisDokumentu()) {
@@ -662,7 +703,7 @@ export default function UkladAplikacji() {
         return
       }
 
-      const sciezkaDocelowa = window.location.pathname
+      const sciezkaDocelowa = window.location.pathname + window.location.search
       const czyZmianaInstancjiSzczegolow = poprawnyWidok === 'zamkniete_szczegoly_organizacyjne_nowe'
         && (typeof stanHistorii.szczegolyInstancjiId !== 'string' || stanHistorii.szczegolyInstancjiId !== pobierzIdInstancjiSzczegolow())
       const czyZmianaTrasy = poprawnyWidok !== aktywnyWidok || sciezkaDocelowa !== ostatniaSciezkaWidoku.current || czyZmianaInstancjiSzczegolow
@@ -688,6 +729,7 @@ export default function UkladAplikacji() {
           ostatniaSciezkaWidoku.current = sciezkaDocelowa
           if (poprawnyWidok === 'zamkniete_szczegoly_organizacyjne_nowe') ustawWersjeFormularzaSzczegolow((obecna) => obecna + 1)
           if (poprawnyWidok === 'profil_uzytkownika') ustawUzytkownikIdProfilu(pobierzIdProfiluZeSciezki())
+          ustawWersjeWynikuWyszukiwania((wersja) => wersja + 1)
           ustawAktywnyWidok(poprawnyWidok)
         })
         return
@@ -698,6 +740,7 @@ export default function UkladAplikacji() {
       if (czyZmianaInstancjiSzczegolow) ustawWersjeFormularzaSzczegolow((obecna) => obecna + 1)
       if (poprawnyWidok === 'profil_uzytkownika') ustawUzytkownikIdProfilu(pobierzIdProfiluZeSciezki())
       ostatniaSciezkaWidoku.current = sciezkaDocelowa
+      if (czyZmianaTrasy) ustawWersjeWynikuWyszukiwania((wersja) => wersja + 1)
       ustawAktywnyWidok(poprawnyWidok)
     }
 
@@ -753,13 +796,13 @@ export default function UkladAplikacji() {
   useEffect(() => wczytajWidokiWTle(), [])
 
   const nazwaGeneratora = konfiguracjePodmenuGeneratorow.find((konfiguracja) => konfiguracja.pozycje[0]?.widok === aktywnyWidok)?.etykieta
-  const widok = <Suspense fallback={<p className="uklad-aplikacji__wczytywanie-widoku" role="status">Wczytywanie widoku…</p>}><WidokAplikacji widok={aktywnyWidok} zmienZakladkeKartotek={zmienZakladkeKartotek} ustawAktywnyWidok={ustawWidok} wersjaProgramu={wersjaProgramu} wersjaFormularzaSzczegolow={wersjaFormularzaSzczegolow} otworzDokument={otworzDokument} uzytkownikIdProfilu={uzytkownikIdProfilu} wybierzProfil={otworzProfil} otworzRekordPulpitu={() => ustawWidok('zamkniete_szczegoly_organizacyjne_lista')} otworzDokumentyPulpitu={() => ustawWidok('dokumenty_wszystkie')} otworzPaczkePulpitu={() => ustawWidok('checklisty_paczek')} /></Suspense>
+  const widok = <Suspense fallback={<p className="uklad-aplikacji__wczytywanie-widoku" role="status">Wczytywanie widoku…</p>}><WidokAplikacji widok={aktywnyWidok} key={wersjaWynikuWyszukiwania + aktywnyWidok} zmienZakladkeKartotek={zmienZakladkeKartotek} ustawAktywnyWidok={ustawWidok} wersjaProgramu={wersjaProgramu} wersjaFormularzaSzczegolow={wersjaFormularzaSzczegolow} otworzDokument={otworzDokument} uzytkownikIdProfilu={uzytkownikIdProfilu} wybierzProfil={otworzProfil} otworzRekordPulpitu={() => ustawWidok('zamkniete_szczegoly_organizacyjne_lista')} otworzDokumentyPulpitu={() => ustawWidok('dokumenty_wszystkie')} otworzPaczkePulpitu={() => ustawWidok('checklisty_paczek')} /></Suspense>
   return (
     <div ref={powloka} className={`uklad-aplikacji${stanMenu.czyPrzypiete && stanMenu.czyOtwarte ? ' uklad-aplikacji--menu-przypiete' : ''}`}>
       <a className="powloka__pomin" href="#obszar-roboczy">Przejdź do treści</a>
       <MenuBoczne key={`${uzytkownikId}-${czyMalyEkran}`} czyMalyEkran={czyMalyEkran} aktywnyWidok={aktywnyWidok} poZmianieStanuMenu={zglosStanMenu} ustawAktywnyWidok={ustawWidok} />
       <div className="uklad-aplikacji__kolumna-glowna">
-        <NaglowekAplikacji aktywnyWidok={aktywnyWidok} czyMenuPrzypiete={stanMenu.czyPrzypiete} czyDockWidoczny={czyDockWidoczny} przelaczDock={() => zmienPreferencjePowloki({ widocznyDock: !czyDockWidoczny })} otworzProfil={() => otworzProfil()} wyloguj={obsluzWylogowanie} />
+        <NaglowekAplikacji otworzWynik={otworzWynikWyszukiwania} aktywnyWidok={aktywnyWidok} czyMenuPrzypiete={stanMenu.czyPrzypiete} czyDockWidoczny={czyDockWidoczny} przelaczDock={() => zmienPreferencjePowloki({ widocznyDock: !czyDockWidoczny })} otworzProfil={() => otworzProfil()} wyloguj={obsluzWylogowanie} />
         {bladPreferencji && <Komunikat status="error">{bladPreferencji}</Komunikat>}
         <main id="obszar-roboczy" tabIndex={-1} className="uklad-aplikacji__obszar-roboczy">{nazwaGeneratora ? <GranicaBleduGeneratora key={`${aktywnyWidok}-${window.location.pathname}`} nazwaGeneratora={nazwaGeneratora} wrocDoDokumentow={() => ustawWidok('dokumenty_wszystkie')}>{widok}</GranicaBleduGeneratora> : widok}</main>
         {czyDockWidoczny && <DockAplikacji skroty={preferencjePowloki.skroty} aktywnyWidok={aktywnyWidok} ustawWidok={ustawWidok} edytuj={() => ustawCzyEdytujeDock(true)} ukryj={() => zmienPreferencjePowloki({ widocznyDock: false })} />}

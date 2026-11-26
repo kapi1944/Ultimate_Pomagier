@@ -1,3 +1,5 @@
+import WyszukiwarkaGlobalna from '../wyszukiwanie/WyszukiwarkaGlobalna'
+import type { WynikWyszukiwania } from '../wyszukiwanie/mechanizmWyszukiwania'
 import AvatarUzytkownika from '../../kartoteki/uzytkownicy/komponenty/AvatarUzytkownika'
 import OdznakaRoli from '../../kartoteki/uzytkownicy/komponenty/OdznakaRoli'
 import { koloryRol, pobierzNadrzednaRoleUzytkownika, pobierzNazweWyswietlanaUzytkownika } from '../../kartoteki/uzytkownicy/typyUzytkownikow'
@@ -11,6 +13,7 @@ import { czyTrybDemonstracyjny } from '../logowanie/uwierzytelnianie'
 import { useEffect, useState } from 'react'
 
 type WlasciwosciNaglowkaAplikacji = {
+  otworzWynik: (wynik: WynikWyszukiwania) => Promise<boolean>
   aktywnyWidok: WidokNawigacji
   czyMenuPrzypiete: boolean
   czyDockWidoczny: boolean
@@ -19,7 +22,7 @@ type WlasciwosciNaglowkaAplikacji = {
   wyloguj: () => void
 }
 
-export default function NaglowekAplikacji({ aktywnyWidok, czyMenuPrzypiete, czyDockWidoczny, przelaczDock, otworzProfil, wyloguj }: WlasciwosciNaglowkaAplikacji) {
+export default function NaglowekAplikacji({ otworzWynik, aktywnyWidok, czyMenuPrzypiete, czyDockWidoczny, przelaczDock, otworzProfil, wyloguj }: WlasciwosciNaglowkaAplikacji) {
   const { zalogowanyUzytkownik } = useKontekstUzytkownika()
   const [czyOnline, ustawCzyOnline] = useState(() => typeof navigator === 'undefined' || navigator.onLine)
   useEffect(() => {
@@ -34,6 +37,7 @@ export default function NaglowekAplikacji({ aktywnyWidok, czyMenuPrzypiete, czyD
 
   return <header className="naglowek-aplikacji">
     <div className="naglowek-aplikacji__lewa-strefa"><span className="naglowek-aplikacji__marka">{informacjeOWersji.nazwaProduktu}</span><nav aria-label="Bieżąca sekcja"><ol>{kontekst.map((etykieta, indeks) => <li key={indeks} aria-current={indeks === kontekst.length - 1 ? 'page' : undefined}>{etykieta}</li>)}</ol></nav></div>
+    <WyszukiwarkaGlobalna otworzWynik={otworzWynik} />
     <div className="naglowek-aplikacji__statusy"><OdznakaStatusu status={czyTrybDemonstracyjny ? "warning" : "info"}>{czyTrybDemonstracyjny ? "Demonstracja lokalna" : czyOnline ? "Konto lokalne" : "Brak internetu — praca lokalna"}</OdznakaStatusu><OdznakaStatusu status="info">{czyMenuPrzypiete ? 'Menu przypięte' : 'Menu zwijane'}</OdznakaStatusu><Przycisk aria-label={czyDockWidoczny ? 'Ukryj dock' : 'Pokaż dock'} aria-pressed={czyDockWidoczny} onClick={przelaczDock}><span className="naglowek-aplikacji__dock-etykieta">{czyDockWidoczny ? 'Ukryj dock' : 'Pokaż dock'}</span><span className="naglowek-aplikacji__dock-krotki" aria-hidden="true">Dock</span></Przycisk></div>
     <section aria-label="Panel zalogowanego użytkownika" className="naglowek-aplikacji__panel-uzytkownika" style={{ borderColor: kolorRoli }}>
       <button aria-label={`Otwórz profil użytkownika ${nazwa}`} className="naglowek-aplikacji__avatar" onClick={otworzProfil} type="button"><AvatarUzytkownika uzytkownik={zalogowanyUzytkownik} /></button>

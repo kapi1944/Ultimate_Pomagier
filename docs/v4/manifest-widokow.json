@@ -450,7 +450,7 @@
       "powierzchnie": [
         "OknoDialogowe otwarty zamknij={anulujZmianeWidoku} tytul=\"Masz niezapisane zmiany\" etykietaZamkniecia=\"ANULUJ\" klasa=\"uklad-aplikacji__dialog-zmian\" opisId=\"uklad-aplikacji__opis-zmian\"",
         "OknoDialogowe otwarty={czyEdytujeDock} zamknij={() => ustawCzyEdytujeDock(false)} tytul=\"Skróty docka\"",
-        "WidokAplikacji widok={aktywnyWidok} zmienZakladkeKartotek={zmienZakladkeKartotek} ustawAktywnyWidok={ustawWidok} wersjaProgramu={wersjaProgramu} wersjaFormularzaSzczegolow={wersjaFormularzaSzczegolow} otworzDokument={otworzDokument} uzytkownikIdProfilu={uzytkownikIdProfilu} wybierzProfil={otworzProfil} otworzRekordPulpitu={() => ustawWidok('zamkniete_szczegoly_organizacyjne_lista')} otworzDokumentyPulpitu={() => ustawWidok('dokumenty_wszystkie')} otworzPaczkePulpitu={() => ustawWidok('checklisty_paczek')}",
+        "WidokAplikacji widok={aktywnyWidok} key={wersjaWynikuWyszukiwania + aktywnyWidok} zmienZakladkeKartotek={zmienZakladkeKartotek} ustawAktywnyWidok={ustawWidok} wersjaProgramu={wersjaProgramu} wersjaFormularzaSzczegolow={wersjaFormularzaSzczegolow} otworzDokument={otworzDokument} uzytkownikIdProfilu={uzytkownikIdProfilu} wybierzProfil={otworzProfil} otworzRekordPulpitu={() => ustawWidok('zamkniete_szczegoly_organizacyjne_lista')} otworzDokumentyPulpitu={() => ustawWidok('dokumenty_wszystkie')} otworzPaczkePulpitu={() => ustawWidok('checklisty_paczek')}",
         "WidokKartotek key=\"kartoteki_klienci\" aktywnaZakladkaPoczatkowa=\"klienci\" poZmianieZakladki={zmienZakladkeKartotek}",
         "WidokKartotek key=\"kartoteki_lokalizacje\" aktywnaZakladkaPoczatkowa=\"lokalizacje\" poZmianieZakladki={zmienZakladkeKartotek}",
         "WidokKartotek key=\"kartoteki_szablony_dokumentow\" aktywnaZakladkaPoczatkowa=\"szablony_dokumentow\" poZmianieZakladki={zmienZakladkeKartotek}",
@@ -1704,6 +1704,14 @@
         "V4-07",
         "V4-08"
       ]
+    },
+    "src/aplikacja/wyszukiwanie/WyszukiwarkaGlobalna.tsx": {
+      "zadanie": "V4-02",
+      "powierzchnie": [],
+      "ukonczoneEtapy": [
+        "V4-02"
+      ],
+      "wspoldzieloneZ": []
     }
   },
   "realizacjaEtapow": {

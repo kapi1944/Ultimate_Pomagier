@@ -1,3 +1,4 @@
+import { pobierzParametrTrasyWyszukiwania } from '../../../../aplikacja/wyszukiwanie/mechanizmWyszukiwania'
 import { useMemo, useState } from 'react'
 import type { WersjaRoboczaGeneratora } from '../typy'
 import { AkcjeRekordu } from '../../../../wspolne/komponenty/AkcjeRekordu'
@@ -19,8 +20,8 @@ type WlasciwosciWidokuKopii = {
 
 export default function WidokKopiiRoboczychSzczegolowOrganizacyjnych({ otworzNoweSzczegoly, otworzKopieRobocza }: WlasciwosciWidokuKopii) {
   const konto = useMemo(() => pobierzAktywneKontoSzczegolow(), [])
-  const [kopie, ustawKopie] = useState(() => pobierzKopieRobocze())
-  const [podgladKopiiId, ustawPodgladKopiiId] = useState<string | null>(null)
+  const [kopie, ustawKopie] = useState(() => { const id = pobierzParametrTrasyWyszukiwania('rekord'); return pobierzKopieRobocze().sort((pierwszy, drugi) => Number(drugi.id === id) - Number(pierwszy.id === id)) })
+  const [podgladKopiiId, ustawPodgladKopiiId] = useState<string | null>(() => pobierzParametrTrasyWyszukiwania('rekord'))
   const opublikowane = useMemo(() => pobierzOpublikowaneSzczegoly(), [])
   const aktualnaKopia = pobierzAktualnaWersjeRobocza()
   const widoczneKopie = kopie.filter((kopia) => kopia.id === aktualnaKopia?.id || czyKontoMozeWidziecKopie(konto, kopia))

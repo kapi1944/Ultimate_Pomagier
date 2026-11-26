@@ -200,8 +200,9 @@ export function zapiszLokalizacjeWMagazynie(lokalizacje: Lokalizacja[]) {
     })
 
     localStorage.setItem(kluczLokalizacji, JSON.stringify(zmianyUzytkownika))
+    return true
   } catch {
-    return
+    return false
   }
 }
 

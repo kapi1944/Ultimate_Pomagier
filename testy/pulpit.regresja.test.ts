@@ -582,7 +582,9 @@ test('anulowanie edycji czyści wybór i przywraca pusty tryb tworzenia bez zapi
   assert.match(przywracanie, /ustawTrybFormularzaZadania\('create'\)/)
   assert.match(przywracanie, /ustawEdytowaneZadanieId\(null\)/)
   assert.match(przywracanie, /ustawWybraneZadanie\(null\)/)
-  assert.match(przywracanie, /ustawFormularzZadania\(pustyFormularz/)
+  assert.match(przywracanie, /const noweDane = pustyFormularz/)
+  assert.match(przywracanie, /ustawFormularzZadania\(noweDane\)/)
+  assert.match(przywracanie, /ustawPodstaweNowegoZadania\(JSON.stringify\(noweDane\)\)/)
   assert.doesNotMatch(przywracanie, /zapiszZadanieReczne|edytujZadanieRecznePrzezZadaniodawce/)
 })
 

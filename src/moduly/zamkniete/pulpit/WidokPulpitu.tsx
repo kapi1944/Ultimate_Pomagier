@@ -1,3 +1,5 @@
+import { pobierzParametrTrasyWyszukiwania } from '../../../aplikacja/wyszukiwanie/mechanizmWyszukiwania'
+import { useOchronaNiezapisanegoDokumentu } from '../../dokumenty/wspolne/useStanDokumentu'
 import FormularzZakupu, { type DaneFormularzaZakupu } from './FormularzZakupu'
 import { czyJestAdministratorem, czyJestZamawiaczem, czyMozeWysylac } from '../../../kartoteki/uzytkownicy/uprawnienia'
 import { useEffect, useId, useMemo, useRef, useState, type ClipboardEvent, type CSSProperties, type Dispatch, type DragEvent, type SetStateAction } from 'react'
@@ -10,7 +12,6 @@ import { blokiNaDzien, domyslnyHarmonogramPracy, oknoKurieraNaDzien, walidujHarm
 import { pobierzUzytkownikow } from '../../../kartoteki/uzytkownicy/magazynUzytkownikow'
 import { pobierzNazweWyswietlanaUzytkownika, type Uzytkownik } from '../../../kartoteki/uzytkownicy/typyUzytkownikow'
 import { pobierzChecklistyPaczek, pobierzSzczegolyDoChecklisty } from '../../dokumenty/generatory/checklisty_paczek/rejestrChecklistPaczek'
-import { czyPozycjaJestAktywna } from '../../dokumenty/generatory/checklisty_paczek/modelChecklistyPaczki'
 import { czyDzienPracy, pobierzEtykietyOsiCzasu, pobierzGraniceDniaPracyNaOsi, pobierzStanWskaznikaCzasu, pozycjaGodzinyNaOsi, type ZakresDniaPracy } from './logika/czasDnia'
 import { formularzZZadania, type FormularzZadania, type TrybFormularzaZadania } from './logika/formularzZadania'
 import { aktualizujKadrMiniatury, przygotujMiniatureZadania } from './logika/miniaturyZadan'
@@ -26,7 +27,7 @@ import RutynyNaOsi from './RutynyNaOsi'
 import { pobierzStylBlokuPracy } from './koloryBlokowPracy'
 import { useRutynyPulpitu } from './useRutynyPulpitu'
 import { dataWarszawska } from '../../../wspolne/czas/kalendarzPracy'
-import { generujZadaniaAutomatyczne } from './logika/zadaniaAutomatyczne'
+import { pobierzZadaniaAutomatyczne } from './uslugi/zadaniaAutomatycznePulpitu'
 import { czyMoznaZmienicKontekstPulpitu } from './logika/kontekstPulpitu'
 import { obliczLicznikiPulpitu } from './logika/podsumowaniePulpitu'
 import { czyPoprawnyLinkProduktu, obliczLiczbeAktywnychZapotrzebowanZakupowych, odmienRzeczDoZakupu, pobierzAktywneZapotrzebowaniaZakupowe, pobierzTekstLicznikaZakupow, walidujNoweZapotrzebowanieZakupowe } from './logika/zapotrzebowaniaZakupowe'
@@ -170,24 +171,6 @@ function etykietaPrzypomnienia(przypomnienie: PrzypomnienieZadania) {
   return przypomnienie.wartosc + ' ' + jednostki[przypomnienie.jednostka]
 }
 
-function pobierzZadaniaAutomatyczne() {
-  const checklisty = pobierzChecklistyPaczek()
-  return generujZadaniaAutomatyczne(
-    pobierzSzczegolyDoChecklisty().flatMap((szczegoly) => szczegoly.grupy.filter((grupa) => Boolean(grupa.dataOd)).map((grupa) => {
-      const checklista = checklisty.find((pozycja) => pozycja.daneDokumentu.szczegolyOrganizacyjneId === szczegoly.id && pozycja.daneDokumentu.grupaId === grupa.id)
-      const pozycjeMaterialow = checklista?.daneDokumentu.pozycje.filter((pozycja) => /materiał|prezentac/i.test(pozycja.nazwa) && pozycja.czyWymagana && czyPozycjaJestAktywna(pozycja))
-      return {
-        id: szczegoly.id,
-        tytul: szczegoly.nazwa + ' \u2014 ' + grupa.nazwa,
-        wlascicielId: szczegoly.opiekunId,
-        data: przesunDate(grupa.dataOd, -7),
-        czyMaTrenera: grupa.trenerzy.some((trener) => trener.imieNazwisko.trim()),
-        czyDaneKlientaKompletne: Boolean(szczegoly.dane.nazwaKlienta.trim() || szczegoly.dane.nabywca.nazwa.trim()),
-        czyMaterialyOdTreneraGotowe: pozycjeMaterialow?.every((pozycja) => pozycja.statusGotowosci === 'GOTOWE'),
-      }
-    })),
-  )
-}
 
 function KartaZadania({ zadanie, teraz, zakresDniaPracy, uzytkownicy, aktualnyUzytkownikId, nazwaSzkolenia, otworz, wykonaj, zmienGodzine, odloz }: {
   zadanie: ZadaniePulpitu
@@ -526,16 +509,20 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
   const liniaOsiRef = useRef<HTMLDivElement>(null)
   const przyciskOsiRef = useRef<HTMLButtonElement>(null)
   const [teraz, ustawTeraz] = useState(() => new Date())
-  const [data, ustawDate] = useState(() => dataWarszawska(new Date()))
+  const [zadanieZTrasy] = useState(() => {
+    const id = pobierzParametrTrasyWyszukiwania('rekord')
+    return id ? [...pobierzStanPulpitu().zadaniaReczne, ...pobierzZadaniaAutomatyczne()].find((zadanie) => zadanie.id === id && czyZadanieWidoczneDlaUzytkownika(zadanie, zalogowanyUzytkownik?.id ?? '')) : undefined
+  })
+  const [data, ustawDate] = useState(() => zadanieZTrasy?.data ?? dataWarszawska(new Date()))
   const [filtr, ustawFiltr] = useState<FiltrPulpitu>('WSZYSTKIE')
   const [stan, ustawStan] = useState(pobierzStanPulpitu)
   const [wybranyUzytkownikId, ustawWybranegoUzytkownikaId] = useState(zalogowanyUzytkownik?.id ?? '')
-  const [wybraneZadanie, ustawWybraneZadanie] = useState<ZadaniePulpitu | null>(null)
+  const [wybraneZadanie, ustawWybraneZadanie] = useState<ZadaniePulpitu | null>(zadanieZTrasy ?? null)
   const [trybFormularzaZadania, ustawTrybFormularzaZadania] = useState<TrybFormularzaZadania>('create')
   const [edytowaneZadanieId, ustawEdytowaneZadanieId] = useState<string | null>(null)
   const [paczkaDoPotwierdzenia, ustawPaczkeDoPotwierdzenia] = useState<WysylkaMonitora | null>(null)
   const [bladWysylki, ustawBladWysylki] = useState('')
-  const [czyFormularzZadaniaOtwarty, ustawCzyFormularzZadaniaOtwarty] = useState(false)
+  const [czyFormularzZadaniaOtwarty, ustawCzyFormularzZadaniaOtwarty] = useState(() => pobierzParametrTrasyWyszukiwania('akcja') === 'dodaj')
   const [czyWykazZakupowOtwarty, ustawCzyWykazZakupowOtwarty] = useState(false)
   const [wybranyZakup, ustawWybranyZakup] = useState<ZapotrzebowanieZakupowe | null>(null)
   const [edytowanyZakup, ustawEdytowanyZakup] = useState<ZapotrzebowanieZakupowe | null>(null)
@@ -544,6 +531,7 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
   const [bladFormularzaZadania, ustawBladFormularzaZadania] = useState('')
   const [bladFormularzaZakupu, ustawBladFormularzaZakupu] = useState('')
   const [formularzZadania, ustawFormularzZadania] = useState(() => pustyFormularz(dataTekstowa(new Date()), zalogowanyUzytkownik?.id ?? ''))
+  const [podstawaNowegoZadania, ustawPodstaweNowegoZadania] = useState(() => JSON.stringify(formularzZadania))
   const poprzedniZalogowanyUzytkownikId = useRef(zalogowanyUzytkownik?.id ?? null)
   const [nowyZakup, ustawNowyZakup] = useState<DaneFormularzaZakupu>(pustyFormularzZakupu)
   const kontenerFormularzaZadaniaRef = useRef<HTMLDivElement>(null)
@@ -608,7 +596,9 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
     ustawWybraneZadanie(null)
     ustawTrybFormularzaZadania('create')
     ustawEdytowaneZadanieId(null)
-    ustawFormularzZadania(pustyFormularz(data, aktualnyId ?? ''))
+    const noweDane = pustyFormularz(data, aktualnyId ?? '')
+    ustawFormularzZadania(noweDane)
+    ustawPodstaweNowegoZadania(JSON.stringify(noweDane))
     ustawBladFormularzaZadania('')
     ustawCzyFormularzZadaniaOtwarty(false)
   }, [zalogowanyUzytkownik?.id, data])
@@ -637,12 +627,14 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
   const opisKuriera = oknoKuriera ? `Spodziewany odbiór kuriera: ${oknoKuriera.poczatek}–${oknoKuriera.koniec}. Orientacyjny przedział, bez potwierdzenia przyjazdu.` : ''
 
   function odswiezStan() { ustawStan(pobierzStanPulpitu()) }
-  function zmienZadanie(zadanie: ZadaniePulpitu) { zapiszZadanieReczne(zadanie); ustawWybraneZadanie((obecne) => obecne?.id === zadanie.id ? zadanie : obecne); odswiezStan() }
+  function zmienZadanie(zadanie: ZadaniePulpitu) { if (!zapiszZadanieReczne(zadanie)) { ustawBladFormularzaZadania('Nie udało się zapisać zadania. Dane pozostały w formularzu.'); return false }; ustawWybraneZadanie((obecne) => obecne?.id === zadanie.id ? zadanie : obecne); odswiezStan(); return true }
   function przywrocTrybTworzenia(czyOtwarty = false) {
     ustawTrybFormularzaZadania('create')
     ustawEdytowaneZadanieId(null)
     ustawWybraneZadanie(null)
-    ustawFormularzZadania(pustyFormularz(data, zalogowanyUzytkownik?.id ?? ''))
+    const noweDane = pustyFormularz(data, zalogowanyUzytkownik?.id ?? '')
+    ustawFormularzZadania(noweDane)
+    ustawPodstaweNowegoZadania(JSON.stringify(noweDane))
     ustawBladFormularzaZadania('')
     ustawCzyFormularzZadaniaOtwarty(czyOtwarty)
   }
@@ -747,22 +739,22 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
       || !zalogowanyUzytkownik
       || trybFormularzaZadania !== 'edit'
       || edytowaneZadanieId !== wybraneZadanie.id
-    ) return
+    ) return false
 
     if (!formularzZadania.tytul.trim()) {
       ustawBladFormularzaZadania('Nazwa zadania jest wymagana.')
-      return
+      return false
     }
 
     if (formularzZadania.rodzajTerminu === 'KONKRETNA_GODZINA' && !formularzZadania.godzina) {
       ustawBladFormularzaZadania('Wybierz godzinę wykonania albo zmień rodzaj terminu.')
-      return
+      return false
     }
 
     const bladPrzypomnien = walidujPrzypomnienia(formularzZadania.przypomnienia)
     if (bladPrzypomnien) {
       ustawBladFormularzaZadania(bladPrzypomnien)
-      return
+      return false
     }
 
     const zadaniobiorcaId =
@@ -770,7 +762,7 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
 
     if (!aktywniUzytkownicy.some((uzytkownik) => uzytkownik.id === zadaniobiorcaId)) {
       ustawBladFormularzaZadania('Wybrany Zadaniobiorca nie jest dostępny.')
-      return
+      return false
     }
 
     const zaktualizowane = edytujZadanieRecznePrzezZadaniodawce(
@@ -797,11 +789,12 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
         'Nie można zapisać zmian. Zadanie mogło zostać wykonane albo nie masz już prawa do jego edycji.'
       )
       odswiezStan()
-      return
+      return false
     }
 
     przywrocTrybTworzenia()
     odswiezStan()
+    return true
   }
 
   function przelaczFiltr(nowyFiltr: FiltrPulpitu) { ustawFiltr((obecny) => obecny === nowyFiltr ? 'WSZYSTKIE' : nowyFiltr) }
@@ -830,21 +823,21 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
   function dodajZadanie() {
     if (!formularzZadania.tytul.trim() || !zalogowanyUzytkownik) {
       ustawBladFormularzaZadania('Nazwa zadania jest wymagana.')
-      return
+      return false
     }
     if (formularzZadania.rodzajTerminu === 'KONKRETNA_GODZINA' && !formularzZadania.godzina) {
       ustawBladFormularzaZadania('Wybierz godzinę wykonania albo zmień rodzaj terminu.')
-      return
+      return false
     }
     const blad = walidujPrzypomnienia(formularzZadania.przypomnienia)
     if (blad) {
       ustawBladFormularzaZadania(blad)
-      return
+      return false
     }
     const wybranyZadaniodawcaId = aktywniUzytkownicy.some((uzytkownik) => uzytkownik.id === formularzZadania.zadaniodawcaId) ? formularzZadania.zadaniodawcaId : ''
     const wybranyZadaniobiorcaId = aktywniUzytkownicy.some((uzytkownik) => uzytkownik.id === formularzZadania.zadaniobiorcaId) ? formularzZadania.zadaniobiorcaId : ''
     const przypisanie = rozstrzygnijPrzypisanieZadania(zalogowanyUzytkownik.id, zalogowanyUzytkownik.rola, wybranyZadaniodawcaId, wybranyZadaniobiorcaId)
-    zmienZadanie({
+    const zapisano = zmienZadanie({
       id: utworzIdZadania(),
       tytul: formularzZadania.tytul.trim(),
       opis: formularzZadania.opis.trim() || undefined,
@@ -865,7 +858,9 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
       czyAutomatyczne: false,
       czyTerminKrytyczny: false,
     })
+    if (!zapisano) return false
     przywrocTrybTworzenia()
+    return true
   }
 
   function usunEdytowaneZadanie() {
@@ -951,6 +946,9 @@ export default function WidokPulpitu({ otworzRekordZrodlowy, otworzDokumenty, ot
     && wybraneZadanie
     && JSON.stringify(formularzZadania) !== JSON.stringify(formularzZZadania(wybraneZadanie))
   )
+
+  const czyNoweZadanieZmienione = czyFormularzZadaniaOtwarty && trybFormularzaZadania === 'create' && JSON.stringify(formularzZadania) !== podstawaNowegoZadania
+  useOchronaNiezapisanegoDokumentu(czyFormularzMaNiezapisaneZmiany || czyNoweZadanieZmienione, () => trybFormularzaZadania === 'edit' ? zapiszEdycjeZadania() : dodajZadanie())
 
   return <section className="widok pulpit" aria-label="Pulpit bieżącej pracy">
     <header className="pulpit__naglowek">
