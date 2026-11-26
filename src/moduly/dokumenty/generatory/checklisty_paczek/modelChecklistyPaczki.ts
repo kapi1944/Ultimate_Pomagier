@@ -328,6 +328,7 @@ export function utworzPozycjeDomyslne(kategorie: KategoriaChecklisty[], wariantO
     utworz('Materiały dodatkowe', 'Materiały', { typ: 'UCZESTNICY' }, 2, { czyOnline: wariantOnline }),
     utworz('Pre/Post-testy', 'Materiały', { typ: 'UCZESTNICY' }, 3, { czyWymagana: false, trybPrePost: 'BRAK' }),
     utworz('Teczki', 'Teczki', { typ: 'UCZESTNICY' }, 0),
+    utworz('Programy', 'Teczki', { typ: 'UCZESTNICY' }, 1),
     utworz('Lista obecności', 'Pakiet CRM', { typ: 'STALA', wartoscStala: 1 }, 0),
     utworz('Ankiety', 'Pakiet CRM', { typ: 'UCZESTNICY' }, 1),
     utworz('Certyfikaty / Dyplomy', 'Pakiet CRM', { typ: 'UCZESTNICY' }, 2),
