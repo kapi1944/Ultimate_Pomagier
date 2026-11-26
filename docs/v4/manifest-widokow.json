@@ -509,6 +509,7 @@
         "div className=\"panel-logowania__wybor\"",
         "form className=\"panel-logowania__formularz\" onSubmit={obsluzLogowanie}",
         "img alt=\"Ultimate Pomagier\" className=\"panel-logowania__logo\" src=\"/logo-ultimate-pomagier-tabliczka.png\"",
+        "label className=\"panel-logowania__checkbox\"",
         "main className=\"panel-logowania\"",
         "span className=\"panel-logowania__pole-hasla\""
       ],
