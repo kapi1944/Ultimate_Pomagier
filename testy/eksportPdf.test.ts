@@ -94,6 +94,7 @@ test('druk obejmuje wskazany obszar, czeka na obrazy i sprząta po anulowaniu lu
     assert.ok(atrybuty.has('data-cel-druku-dokumentu'))
     assert.ok(atrybutyPrzodka.has('data-przodek-druku-dokumentu'))
     assert.ok(styl.textContent.includes('A5 landscape'))
+    assert.match(styl.textContent, /size: A5 landscape !important; margin: 0 !important/, 'Druk obszaru nie może przegrać z późniejszym globalnym @page innego generatora.')
     if (czyBladDruku) throw new Error('Błąd drukarki')
     zdarzenia.dispatchEvent(new Event('afterprint'))
   } } as unknown as Window & typeof globalThis

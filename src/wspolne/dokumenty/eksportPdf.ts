@@ -89,9 +89,11 @@ export async function drukujDokument(obszar?: HTMLElement, orientacja: 'pionowa'
   for (let element = obszar.parentElement; element; element = element.parentElement) przodkowie.push(element)
   const stylStrony = document.createElement('style')
   const rozmiar = Array.isArray(format) ? `${format[0]}mm ${format[1]}mm` : `${format.toUpperCase()} ${orientacja === 'pozioma' ? 'landscape' : 'portrait'}`
+  // Leniwie ładowane style innych generatorów mogą dodać późniejsze, globalne @page.
+  // Chrome rozstrzyga je kolejnością, nawet wobec strony nazwanej, więc druk wskazanego obszaru wymaga !important.
   stylStrony.textContent = plynnyUklad
-    ? `@page { size: ${rozmiar}; margin: 9mm; background: white; }`
-    : `@page dokument-generatora { size: ${rozmiar}; margin: 0; }`
+    ? `@page { size: ${rozmiar} !important; margin: 9mm !important; background: white; }`
+    : `@page dokument-generatora { size: ${rozmiar} !important; margin: 0 !important; }`
   document.head.append(stylStrony)
   obszar.setAttribute('data-cel-druku-dokumentu', '')
   przodkowie.forEach((element) => element.setAttribute('data-przodek-druku-dokumentu', ''))
