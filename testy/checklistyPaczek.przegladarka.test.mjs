@@ -677,10 +677,11 @@ test('1.2.3: kompletowanie 30 egzemplarzy, dwie paczki, ponowienie zapisu, Pulpi
         const czyRozny = (piksel, przesuniecie) => {
           const drugiPiksel = piksel + przesuniecie * 4
           if (drugiPiksel < 0 || drugiPiksel >= drugi.data.length) return true
-          return [0, 1, 2].some((kanal) => Math.abs(pierwszy.data[piksel + kanal] - drugi.data[drugiPiksel + kanal]) > 10)
+          return [0, 1, 2].some((kanal) => Math.abs(pierwszy.data[piksel + kanal] - drugi.data[drugiPiksel + kanal]) > 24)
         }
-        // Raster może przesunąć pojedynczą krawędź tabeli o 1 px (subpikselowe położenie podglądu w trybie).
-        // Różnicą jest dopiero piksel bez odpowiednika w tym samym miejscu ani w sąsiednim wierszu/kolumnie.
+        // Raster może przesunąć pojedynczą krawędź tabeli o 1 px albo zmienić jej antyaliasing
+        // (w CI na Linuksie: 218 vs 230 na jednej linii). Zmiana treści daje różnice rzędu 100–200,
+        // więc piksel jest różny dopiero przy odchyleniu > 24 i bez odpowiednika w sąsiednim wierszu/kolumnie.
         for (let piksel = 0; piksel < pierwszy.data.length; piksel += 4) {
           if ([0, szerokosc, -szerokosc, 1, -1].every((przesuniecie) => czyRozny(piksel, przesuniecie))) {
             liczbaRoznic++
