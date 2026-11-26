@@ -24,6 +24,8 @@
 @media (max-width: 760px) { .panel-logowania__formularz { grid-template-columns: minmax(0, 1fr); } .panel-logowania__formularz header { gap: 16px; } .panel-logowania__logo { width: min(100%, 320px); } }
 @media (max-width: 440px) { .panel-logowania__konta { grid-template-columns: minmax(0, 1fr); } }
 .panel-logowania__wybor > label { display: grid; gap: 8px; }
+.panel-logowania__wybor > label.panel-logowania__checkbox { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.panel-logowania__checkbox input[type="checkbox"] { flex: none; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: var(--ui-akcent); }
 .panel-logowania__wybor input:not([type="checkbox"]) { width: 100%; min-width: 0; padding: 12px; border: 1px solid var(--ui-obramowanie); border-radius: var(--ui-promien-pola); background: var(--ui-pole); color: var(--ui-tekst); font: inherit; }
 .panel-logowania__wybor input:focus-visible { outline: 2px solid var(--ui-focus); outline-offset: 2px; }
 .panel-logowania__pole-hasla { position: relative; display: block; min-width: 0; }

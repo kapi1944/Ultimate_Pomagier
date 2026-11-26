@@ -3,7 +3,7 @@ import { odtworzStatusyZatwierdzen, przelaczZatwierdzenie } from '../src/moduly/
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { readFileSync } from 'node:fs'
-import { parsujMailaSzczegolow } from '../src/moduly/zamkniete/szczegoly_organizacyjne/uslugi/parserMailaSzczegolow.ts'
+import { oczyscWartoscKontaktowa, parsujMailaSzczegolow } from '../src/moduly/zamkniete/szczegoly_organizacyjne/uslugi/parserMailaSzczegolow.ts'
 import { przygotujMapowanieImportuMaila } from '../src/moduly/zamkniete/szczegoly_organizacyjne/uslugi/mapowanieImportuMaila.ts'
 import { poczatkowaGrupa, poczatkoweDaneFormularza } from '../src/moduly/zamkniete/szczegoly_organizacyjne/danePoczatkowe.ts'
 import { daneStartoweUzytkownikow } from '../src/kartoteki/uzytkownicy/daneUzytkownikow.ts'
@@ -46,6 +46,24 @@ test('błędny telefon importowany nie traci liter i wymaga weryfikacji', () => 
 for (const email of ['kontakt__szkolenia@firma.pl', 'kontakt|szkolenia@firma.pl', 'kontakt**szkolenia@firma.pl']) {
   test(`import zachowuje poprawne znaki części lokalnej: ${email}`, () => {
     assert.equal(parsujMailaSzczegolow(`Email nabywcy: ${email}`).daneFormularza.nabywca?.email, email)
+  })
+}
+test('wartość kontaktowa traci przecinki, kropki, średniki i myślniki na krawędziach, ale zachowuje wnętrze', () => {
+  assert.equal(oczyscWartoscKontaktowa(' ,Jan Kowalski.;-'), 'Jan Kowalski')
+  assert.equal(oczyscWartoscKontaktowa('Anna-Maria Nowak'), 'Anna-Maria Nowak')
+  assert.equal(oczyscWartoscKontaktowa('.12-345-67-89,'), '12-345-67-89')
+})
+for (const [etykieta, wartosc, oczekiwana] of [
+  ['Imię i nazwisko odbiorcy', 'Weronika Solpa,', 'Weronika Solpa'],
+  ['Imię i nazwisko odbiorcy', ' ;Weronika Solpa.-', 'Weronika Solpa'],
+  ['Telefon odbiorcy', '12 395 70 42,', '12 395 70 42'],
+  ['Telefon odbiorcy', '.12 395 70 42;', '12 395 70 42'],
+  ['Email odbiorcy', 'kontakt@firma.pl.', 'kontakt@firma.pl'],
+] as const) {
+  test(`import odbiorcy nie wprowadza znaków brzegowych: ${etykieta} „${wartosc}”`, () => {
+    const wynik = parsujMailaSzczegolow(`Nazwa firmy odbiorcy: Firma testowa\n${etykieta}: ${wartosc}`)
+    const pole = etykieta.startsWith('Imię') ? 'imieNazwiskoOdbiorcy' : etykieta.startsWith('Telefon') ? 'telefon' : 'email'
+    assert.equal(wynik.daneFormularza.odbiorca?.[pole], oczekiwana)
   })
 }
 test('błędne kontakty paczki są zachowane do weryfikacji', () => {
