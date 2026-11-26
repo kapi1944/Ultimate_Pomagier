@@ -1,11 +1,18 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { Lokalizacja } from '../src/kartoteki/lokalizacje/typyLokalizacji.ts'
-import { zbudujIndeksLokalizacjiSzczegolow } from '../src/moduly/zamkniete/szczegoly_organizacyjne/uslugi/indeksLokalizacjiSzczegolow.ts'
+import { brakPodpowiedziMiejscowosci } from '../src/kartoteki/lokalizacje/wyszukiwanieMiejscowosci.ts'
+import { zbudujIndeksLokalizacjiSzczegolow, pobierzNazweZMiejsca } from '../src/moduly/zamkniete/szczegoly_organizacyjne/uslugi/indeksLokalizacjiSzczegolow.ts'
 
 function lokalizacja(nazwa: string, klucz = nazwa): Lokalizacja {
   return { nazwa, klucz_lokalizacji: klucz, wojewodztwo: '', rodzaj: '', gmina: '', powiat: '', miejscownik_pelny_auto: '', status_odmiany: false }
 }
+
+test('nazwa miejscowości jest wyciągana z samego miasta oraz z końca adresu z kodem pocztowym', () => {
+  assert.equal(pobierzNazweZMiejsca(' ŁÓDŹ '), 'łódź')
+  assert.equal(pobierzNazweZMiejsca('Hotel Bulwary, ul. Rzeczna 8, 39-300 Mielec'), 'mielec')
+  assert.equal(pobierzNazweZMiejsca(''), '')
+})
 
 test('indeks zachowuje polskie znaki, adres z kodem i jednoznaczność dopasowania', () => {
   const lodz = lokalizacja('Łódź')
@@ -17,19 +24,16 @@ test('indeks zachowuje polskie znaki, adres z kodem i jednoznaczność dopasowan
   assert.deepEqual(indeks.znajdz('Lodz'), null)
   assert.deepEqual(indeks.znajdz('Brzeziny'), null)
   assert.deepEqual(indeks.znajdz(''), null)
-  assert.deepEqual(indeks.podpowiedz('ÓDŹ'), [lodz])
 })
 
-test('limit 50 dotyczy wyników, zachowuje kolejność i nie pomija późniejszych dopasowań', () => {
-  const miejscowosci = Array.from({ length: 120 }, (_, indeks) => lokalizacja(`Miejscowość ${indeks}`))
-  const ostatnia = lokalizacja('Żółkiewka')
-  const indeks = zbudujIndeksLokalizacjiSzczegolow([...miejscowosci, ostatnia])
-  assert.deepEqual(indeks.podpowiedz(''), miejscowosci.slice(0, 50))
-  assert.deepEqual(indeks.podpowiedz('miejscowość'), miejscowosci.slice(0, 50))
-  assert.deepEqual(indeks.podpowiedz(' żół '), [ostatnia])
+test('podpowiedzi indeksu pochodzą z podanego źródła nazw (najpierw początek, potem zawieranie)', () => {
+  const zrodlo = (fraza: string) => (fraza === 'do' ? { poczatek: ['Dobkowice'], zawierajace: ['Wadowice'] } : brakPodpowiedziMiejscowosci)
+  const indeks = zbudujIndeksLokalizacjiSzczegolow([], null, zrodlo)
+  assert.deepEqual(indeks.podpowiedz('do'), { poczatek: ['Dobkowice'], zawierajace: ['Wadowice'] })
+  assert.deepEqual(indeks.podpowiedz('x'), brakPodpowiedziMiejscowosci)
 })
 
-test('odświeżenie indeksu uwzględnia potwierdzenie odmiany i nowe lokalizacje', () => {
+test('odświeżony indeks uwzględnia potwierdzenie odmiany i nowe lokalizacje, a stary pozostaje niezmieniony', () => {
   const przed = lokalizacja('Łódź')
   const po = { ...przed, miejscownik_pelny_auto: 'Łodzi', status_odmiany: true }
   const staryIndeks = zbudujIndeksLokalizacjiSzczegolow([przed])
@@ -45,33 +49,4 @@ test('pusta nazwa w kartotece nie dopasowuje pustego pola formularza', () => {
   const indeks = zbudujIndeksLokalizacjiSzczegolow(lokalizacje)
   for (const miejsce of ['', ' ', 'Brzeziny', 'Nieznane', 'Lodz']) assert.equal(indeks.znajdz(miejsce), null, miejsce)
   assert.deepEqual(indeks.znajdz('90-001 Łódź'), lokalizacje[1])
-})
-
-test('migawka wykrywa zmianę odmiany, nazw, kolejności i usunięcie lokalizacji', () => {
-  const lokalizacje = [lokalizacja('Łódź'), lokalizacja('Mielec')]
-  const indeks = zbudujIndeksLokalizacjiSzczegolow(lokalizacje)
-  assert.equal(indeks.czyAktualny(structuredClone(lokalizacje)), true)
-  assert.equal(indeks.czyAktualny([...lokalizacje].reverse()), false)
-  assert.equal(indeks.czyAktualny(lokalizacje.slice(1)), false)
-  lokalizacje[0].status_odmiany = true
-  lokalizacje[0].miejscownik_pelny_auto = 'Łodzi'
-  assert.equal(indeks.czyAktualny(lokalizacje), false)
-  assert.equal(indeks.znajdz('Łódź')?.status_odmiany, false)
-  const odswiezony = zbudujIndeksLokalizacjiSzczegolow(lokalizacje)
-  assert.equal(odswiezony.znajdz('Łódź')?.miejscownik_pelny_auto, 'Łodzi')
-  lokalizacje[0].nazwa = 'Inna miejscowość'
-  assert.equal(odswiezony.czyAktualny(lokalizacje), false)
-})
-
-test('wspólny indeks jest budowany raz dla tej samej listy i odświeżany tylko przy zmianie danych', async () => {
-  const { pobierzWspolnyIndeksLokalizacji, odswiezIndeksLokalizacji } = await import('../src/moduly/zamkniete/szczegoly_organizacyjne/uslugi/indeksLokalizacjiSzczegolow.ts')
-  const lista = [lokalizacja('Łódź'), lokalizacja('Mielec')]
-  const indeks = pobierzWspolnyIndeksLokalizacji(lista)
-  assert.equal(pobierzWspolnyIndeksLokalizacji(lista), indeks)
-  assert.equal(odswiezIndeksLokalizacji(indeks, lista), indeks)
-  assert.equal(odswiezIndeksLokalizacji(indeks, structuredClone(lista)), indeks, 'równa treść nie przebudowuje indeksu')
-  const zmieniona = [{ ...lista[0], status_odmiany: true, miejscownik_pelny_auto: 'Łodzi' }, lista[1]]
-  const nowy = odswiezIndeksLokalizacji(indeks, zmieniona)
-  assert.notEqual(nowy, indeks)
-  assert.equal(nowy.znajdz('Łódź')?.miejscownik_pelny_auto, 'Łodzi')
 })

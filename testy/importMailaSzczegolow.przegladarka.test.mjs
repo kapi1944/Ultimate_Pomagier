@@ -266,6 +266,8 @@ test('import V4 w formularzu: kartoteki, lokalizacja, rozliczenia, jakość i oc
       const { rozpocznijSesje } = await import('/src/aplikacja/logowanie/sesjaUzytkownika.ts')
       const { pobierzLokalizacjeZMagazynu, znajdzLokalizacjeDlaMiejsca, ustawPotwierdzonyMiejscownikLokalizacji } = await import('/src/kartoteki/lokalizacje/magazynLokalizacji.ts')
       localStorage.setItem('ultimate-pomagier.kartoteki.trenerzy', JSON.stringify([{ id: 'trener-test-17', imie: 'Renata', nazwisko: 'Stefaniuk', email: 'trener@example.org', telefon: '', status: 'Aktywny' }]))
+      const { zaladujLokalizacjeDlaNazw } = await import('/src/kartoteki/lokalizacje/ladowanieKatalogu.ts')
+      await zaladujLokalizacjeDlaNazw(['Mielec'])
       const lokalizacja = znajdzLokalizacjeDlaMiejsca('Mielec', pobierzLokalizacjeZMagazynu())
       if (!lokalizacja) throw new Error('Brak jednoznacznego Mielca w kartotece testowej')
       if (znajdzLokalizacjeDlaMiejsca('Hotel Bulwary, ul. Rzeczna 8, 39-300 Mielec', [lokalizacja])?.klucz_lokalizacji !== lokalizacja.klucz_lokalizacji) throw new Error('Pełny adres nie trafił do mechanizmu lokalizacji')
@@ -358,6 +360,8 @@ test('import OZE w formularzu: wartości A–G, statusy, ręczne 48 osób i pono
     await strona.evaluate(async () => {
       const { rozpocznijSesje } = await import('/src/aplikacja/logowanie/sesjaUzytkownika.ts')
       const { pobierzLokalizacjeZMagazynu, zapiszLokalizacjeWMagazynie, ustawPotwierdzonyMiejscownikLokalizacji } = await import('/src/kartoteki/lokalizacje/magazynLokalizacji.ts')
+      const { zaladujLokalizacjeDlaNazw } = await import('/src/kartoteki/lokalizacje/ladowanieKatalogu.ts')
+      await zaladujLokalizacjeDlaNazw(['Łódź'])
       const lokalizacje = pobierzLokalizacjeZMagazynu()
       const lokalizacja = lokalizacje.find((pozycja) => pozycja.nazwa === 'Łódź' && pozycja.rodzaj === 'miasto')
       if (!lokalizacja) throw new Error('Brak miasta Łódź w kartotece testowej')

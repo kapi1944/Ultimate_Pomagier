@@ -1,5 +1,6 @@
 import { ZnacznikStatusu } from './PolaSzczegolow'
 import { memo, useEffect, useMemo, useState } from 'react'
+import { ListaPodpowiedziMiejscowosci } from '../../../../kartoteki/lokalizacje/ListaPodpowiedziMiejscowosci'
 import {
   ustawPotwierdzonyMiejscownikLokalizacji,
 } from '../../../../kartoteki/lokalizacje/magazynLokalizacji'
@@ -294,7 +295,6 @@ function ZawartoscKartyGrupy({
   }, [trenerzyDoWyboru])
   const indeksTrenerow = useMemo(() => new Map([...etykietyTrenerow].map(([id, etykieta]) => [id, etykieta.toLocaleLowerCase('pl')])), [etykietyTrenerow])
   const wybranaLokalizacja = useMemo(() => indeksLokalizacji.znajdz(grupa.miejsce), [grupa.miejsce, indeksLokalizacji])
-  const lokalizacjeDoPodpowiedzi = useMemo(() => indeksLokalizacji.podpowiedz(grupa.miejsce), [grupa.miejsce, indeksLokalizacji])
   const trenerzyDoPodpowiedzi = useMemo(() => {
     const fraza = wartoscWyszukiwanegoTrenera.trim().toLocaleLowerCase('pl')
     return trenerzyDoWyboru.filter((trener) => !fraza || indeksTrenerow.get(trener.id)?.includes(fraza)).slice(0, 50)
@@ -473,11 +473,7 @@ function ZawartoscKartyGrupy({
                 value={grupa.miejsce}
                 onChange={(zdarzenie) => ustawMiejsce(zdarzenie.target.value)}
               />
-              <datalist id={`lokalizacje-${grupa.id}`}>
-                {lokalizacjeDoPodpowiedzi.map((lokalizacja) => (
-                  <option key={lokalizacja.klucz_lokalizacji} value={lokalizacja.nazwa} />
-                ))}
-              </datalist>
+              <ListaPodpowiedziMiejscowosci fraza={grupa.miejsce} id={`lokalizacje-${grupa.id}`} />
               {bladMiejsca && <span className="szczegoly-pole__blad" id={pobierzIdBleduPola(poleMiejsca)}>{bladMiejsca}</span>}
               {wybranaLokalizacja && <span className="szczegoly-pole__pomoc">Miejscownik: {wybranaLokalizacja.miejscownik_pelny_auto}</span>}
               {wybranaLokalizacja && !wybranaLokalizacja.status_odmiany && (

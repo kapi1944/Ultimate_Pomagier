@@ -7,6 +7,7 @@ import { pobierzKlientowZKartoteki } from '../../../../kartoteki/klienciKartotek
 import { pobierzUzytkownikow } from '../../../../kartoteki/uzytkownicy/magazynUzytkownikow'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useOchronaNiezapisanegoDokumentu } from '../../../dokumenty/wspolne/useStanDokumentu'
+import { subskrybujKatalogLokalizacji, zaladujLokalizacjeDlaNazw } from '../../../../kartoteki/lokalizacje/ladowanieKatalogu'
 import {
   pobierzLokalizacjeZMagazynu,
   znajdzLokalizacjeDlaMiejsca,
@@ -65,7 +66,7 @@ import { parsujMailaSzczegolow } from '../uslugi/parserMailaSzczegolow'
 import { przygotujMapowanieImportuMaila } from '../uslugi/mapowanieImportuMaila'
 import { czyKontoMozeEdytowacSzczegoly } from '../uzytkownicySzczegolow'
 import { pobierzIdPola } from '../komponenty/identyfikatoryPol'
-import { odswiezIndeksLokalizacji, pobierzWspolnyIndeksLokalizacji, type IndeksLokalizacjiSzczegolow } from '../uslugi/indeksLokalizacjiSzczegolow'
+import { pobierzNazweZMiejsca, pobierzWspolnyIndeksLokalizacji, type IndeksLokalizacjiSzczegolow } from '../uslugi/indeksLokalizacjiSzczegolow'
 
 
 const etykietySekcji: Record<KluczSekcjiSzczegolow, string> = {
@@ -494,7 +495,7 @@ function zbudujProblemyWalidacjiDanych(dane: DaneFormularza): ProblemWalidacji[]
   return problemy
 }
 
-export function zbudujProblemyWalidacji(dane: DaneFormularza, grupy: GrupaSzkoleniowa[], indeksLokalizacji = pobierzWspolnyIndeksLokalizacji(pobierzLokalizacjeZMagazynu())): ProblemWalidacji[] {
+export function zbudujProblemyWalidacji(dane: DaneFormularza, grupy: GrupaSzkoleniowa[], indeksLokalizacji = pobierzWspolnyIndeksLokalizacji()): ProblemWalidacji[] {
   return [...zbudujProblemyWalidacjiDanych(dane), ...zbudujProblemyWalidacjiGrup(grupy, indeksLokalizacji)]
 }
 
@@ -681,7 +682,7 @@ export function useGeneratorSzczegolow() {
     ustawAutosaveDoDecyzji(null)
     ustawKomunikat('Odrzucono niezapisane zmiany.')
   }
-  const [indeksLokalizacji, ustawIndeksLokalizacji] = useState(() => pobierzWspolnyIndeksLokalizacji(pobierzLokalizacjeZMagazynu()))
+  const [indeksLokalizacji, ustawIndeksLokalizacji] = useState(pobierzWspolnyIndeksLokalizacji)
   const problemyDanych = useMemo(() => zbudujProblemyWalidacjiDanych(daneFormularza), [daneFormularza])
   const walidujGrupe = useMemo(() => utworzWalidatorGrupy(indeksLokalizacji), [indeksLokalizacji])
   const problemyGrup = useMemo(() => grupy.length ? grupy.flatMap(walidujGrupe) : zbudujProblemyWalidacjiGrup(grupy, indeksLokalizacji), [grupy, walidujGrupe, indeksLokalizacji])
@@ -854,23 +855,37 @@ export function useGeneratorSzczegolow() {
     ustawGrupy((obecne) => przetworzUsuniecieGrupy(obecne, id, czyPotwierdzone))
   }, [czyMoznaEdytowac])
 
+  // Ten sam obiekt oznacza brak zmian (nowe wczytane województwo albo nowy zapis kartoteki dają nowy indeks), więc zwykłe odświeżenie nie przebudowuje walidacji.
   const odswiezLokalizacje = useCallback(() => {
-    const lokalizacje = pobierzLokalizacjeZMagazynu()
-    ustawIndeksLokalizacji((obecny) => odswiezIndeksLokalizacji(obecny, lokalizacje))
+    ustawIndeksLokalizacji(pobierzWspolnyIndeksLokalizacji())
   }, [])
 
   useEffect(() => {
     window.addEventListener('storage', odswiezLokalizacje)
     window.addEventListener('focus', odswiezLokalizacje)
+    const anulujSubskrypcje = subskrybujKatalogLokalizacji(odswiezLokalizacje)
     return () => {
       window.removeEventListener('storage', odswiezLokalizacje)
       window.removeEventListener('focus', odswiezLokalizacje)
+      anulujSubskrypcje()
     }
   }, [odswiezLokalizacje])
 
+  // Rekordy lokalizacji są ładowane na żądanie: dla miejsc wpisanych w grupach wczytujemy tylko województwa, w których te nazwy występują.
+  const miejscaDoRozpoznania = useMemo(
+    () => [...new Set(grupy.filter((grupa) => grupa.formaSzkolenia !== 'Online').map((grupa) => pobierzNazweZMiejsca(grupa.miejsce)).filter(Boolean))].sort().join('\n'),
+    [grupy],
+  )
+
+  useEffect(() => {
+    if (!miejscaDoRozpoznania) return
+    zaladujLokalizacjeDlaNazw(miejscaDoRozpoznania.split('\n')).catch(() => {
+      ustawKomunikat('Nie udało się wczytać kartoteki lokalizacji. Odmiana nazw miejscowości nie zostanie sprawdzona.')
+    })
+  }, [miejscaDoRozpoznania])
+
   function sprawdzJakosc() {
-    const aktualneLokalizacje = pobierzLokalizacjeZMagazynu()
-    const aktualnyIndeks = odswiezIndeksLokalizacji(indeksLokalizacji, aktualneLokalizacje)
+    const aktualnyIndeks = pobierzWspolnyIndeksLokalizacji()
     const problemy = zbudujProblemyWalidacji(daneFormularza, grupy, aktualnyIndeks)
     const model = zbudujModelSekcyjny(daneFormularza, grupy, adresaci, efektywneStatusyPol, problemy)
     ustawIndeksLokalizacji(aktualnyIndeks)

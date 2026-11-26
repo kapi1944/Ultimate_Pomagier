@@ -509,6 +509,7 @@
         "div className=\"panel-logowania__wybor\"",
         "form className=\"panel-logowania__formularz\" onSubmit={obsluzLogowanie}",
         "img alt=\"Ultimate Pomagier\" className=\"panel-logowania__logo\" src=\"/logo-ultimate-pomagier-tabliczka.png\"",
+        "label className=\"panel-logowania__checkbox\"",
         "main className=\"panel-logowania\"",
         "span className=\"panel-logowania__pole-hasla\""
       ],
@@ -590,6 +591,16 @@
       "ukonczoneEtapy": [],
       "wspoldzieloneZ": [
         "V4-21"
+      ]
+    },
+    "src/kartoteki/lokalizacje/ListaPodpowiedziMiejscowosci.tsx": {
+      "zadanie": "V4-20",
+      "powierzchnie": [],
+      "ukonczoneEtapy": [],
+      "wspoldzieloneZ": [
+        "V4-07",
+        "V4-13",
+        "V4-15"
       ]
     },
     "src/kartoteki/szablony_dokumentow/WidokSzablonowDokumentow.tsx": {

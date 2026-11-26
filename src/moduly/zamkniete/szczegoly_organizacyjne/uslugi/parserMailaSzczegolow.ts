@@ -334,6 +334,22 @@ function oczyscNazweOsoby(wartosc: string) {
     .replace(/\+?\d[\d ()-]{6,}/g, '').replace(/^(?:(?:prof|dr|hab|mgr|inż)\.?\s+)+/i, '').replace(/\s+/g, ' ').trim()
 }
 
+// Przecinki, kropki, średniki i myślniki na początku/końcu wartości kontaktowej to pozostałość po kopiowaniu z maila.
+const znakiBrzegoweKontaktu = /^[\s,;.\-–—]+|[\s,;.\-–—]+$/gu
+
+export function oczyscWartoscKontaktowa(wartosc: string) {
+  return wartosc.replace(znakiBrzegoweKontaktu, '').trim()
+}
+
+const polaOsnoweKontaktu: readonly string[] = ['imieNazwisko', 'imieNazwiskoOdbiorcy', 'osobaKontaktowa', 'telefon', 'email']
+
+function oczyscOsnoweDaneKontaktu<Typ extends object>(kontakt: Typ): Typ {
+  return Object.fromEntries(Object.entries(kontakt).map(([klucz, wartosc]) => [
+    klucz,
+    polaOsnoweKontaktu.includes(klucz) && typeof wartosc === 'string' ? oczyscWartoscKontaktowa(wartosc) : wartosc,
+  ])) as Typ
+}
+
 function dopasujOsobe<Typ extends { email: string }>(wartosc: string, osoby: readonly Typ[], nazwa: (osoba: Typ) => string, emaile: (osoba: Typ) => string[] = (osoba) => [osoba.email]) {
   const email = znajdzEmail(wartosc).toLowerCase()
   const poEmailu = email ? osoby.filter((osoba) => emaile(osoba).some((adres) => adres.toLowerCase() === email)) : []
@@ -566,8 +582,8 @@ export function parsujMailaSzczegolow(tresc: string, kartoteki: KartotekiImportu
     pierwszaGrupa.trenerzy = [
       {
         id: `trener-import-${encodeURIComponent(normalizujTekst(oczyscNazweOsoby(trener)))}`,
-        imieNazwisko: oczyscNazweOsoby(trener),
-        telefon: znajdzTelefon(trener),
+        imieNazwisko: oczyscWartoscKontaktowa(oczyscNazweOsoby(trener)),
+        telefon: oczyscWartoscKontaktowa(znajdzTelefon(trener)),
         email: znajdzEmail(trener),
       },
     ]
@@ -863,6 +879,7 @@ export function parsujMailaSzczegolow(tresc: string, kartoteki: KartotekiImportu
   for (const obiekt of ['nabywca', 'odbiorca', 'odbiorcaPaczki'] as const) {
     const kontakt = daneFormularza[obiekt]
     if (!kontakt) continue
+    Object.assign(kontakt, oczyscOsnoweDaneKontaktu(kontakt))
     if (kontakt.email) kontakt.email = znajdzEmail(kontakt.email) || kontakt.email
     for (const pole of ['email', 'telefon'] as const) {
       if (kontakt[pole] && pobierzBladKontaktu(pole, kontakt[pole])) dodajNiepewne(polaNiepewne, `${obiekt}.${pole}`)

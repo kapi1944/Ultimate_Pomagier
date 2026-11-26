@@ -672,19 +672,41 @@ test('1.2.3: kompletowanie 30 egzemplarzy, dwie paczki, ponowienie zapisu, Pulpi
       const roznice = piksele[0].map((pierwszy, indeks) => {
         const drugi = piksele[1][indeks]
         let liczbaRoznic = 0
+        let obszar = null
+        const szerokosc = pierwszy.width
+        const czyRozny = (piksel, przesuniecie) => {
+          const drugiPiksel = piksel + przesuniecie * 4
+          if (drugiPiksel < 0 || drugiPiksel >= drugi.data.length) return true
+          return [0, 1, 2].some((kanal) => Math.abs(pierwszy.data[piksel + kanal] - drugi.data[drugiPiksel + kanal]) > 24)
+        }
+        // Raster może przesunąć pojedynczą krawędź tabeli o 1 px albo zmienić jej antyaliasing
+        // (w CI na Linuksie: 218 vs 230 na jednej linii). Zmiana treści daje różnice rzędu 100–200,
+        // więc piksel jest różny dopiero przy odchyleniu > 24 i bez odpowiednika w sąsiednim wierszu/kolumnie.
         for (let piksel = 0; piksel < pierwszy.data.length; piksel += 4) {
-          if ([0, 1, 2].some((kanal) => Math.abs(pierwszy.data[piksel + kanal] - drugi.data[piksel + kanal]) > 10)) {
+          if ([0, szerokosc, -szerokosc, 1, -1].every((przesuniecie) => czyRozny(piksel, przesuniecie))) {
             liczbaRoznic++
+            const x = (piksel / 4) % szerokosc
+            const y = Math.floor(piksel / 4 / szerokosc)
+            obszar = obszar ? [Math.min(obszar[0], x), Math.min(obszar[1], y), Math.max(obszar[2], x), Math.max(obszar[3], y)] : [x, y, x, y]
           }
         }
-        return { liczbaRoznic, liczbaPikseli: pierwszy.width * pierwszy.height }
+        const wycinki = obszar ? [pierwszy, drugi].map((obraz) => {
+          const kanwa = document.createElement('canvas')
+          kanwa.width = Math.min(360, obszar[2] - obszar[0] + 21)
+          kanwa.height = Math.min(120, obszar[3] - obszar[1] + 21)
+          kanwa.getContext('2d').putImageData(obraz, -Math.max(0, obszar[0] - 10), -Math.max(0, obszar[1] - 10))
+          return kanwa.toDataURL()
+        }) : []
+        return { liczbaRoznic, liczbaPikseli: pierwszy.width * pierwszy.height, obszar, wycinki }
       })
       return { wyniki, roznice, wymiary: piksele.map((strony) => strony.map((obraz) => [obraz.width, obraz.height])) }
     }, [Array.from(bajty), Array.from(bajtyZEdycji)])
     for (const [indeks, strony] of obrazyPdf.wyniki.entries()) for (const [numer, obraz] of strony.entries()) await writeFile(`tmp/kompletowanie-pdf-${indeks}-${numer}.png`, Buffer.from(obraz.split(',')[1], 'base64'))
     assert.deepEqual(obrazyPdf.wymiary[0], obrazyPdf.wymiary[1], 'Oba tryby zachowują liczbę i wymiary stron PDF')
     // Rasterowy eksport może różnić się antyaliasingiem pojedynczej krawędzi tabeli.
-    assert.ok(obrazyPdf.roznice.every((roznica) => roznica.liczbaRoznic / roznica.liczbaPikseli < 0.001), `Oba tryby zachowują wygląd PDF z tolerancją 0,1% pikseli: ${JSON.stringify(obrazyPdf.roznice)}`)
+    // Przy niezgodności wypisujemy wycinki obu rastrów (data URL), bo CI nie publikuje katalogu tmp.
+    for (const roznica of obrazyPdf.roznice) if (roznica.liczbaRoznic / roznica.liczbaPikseli >= 0.001) console.log('Różnica rastrów PDF', JSON.stringify(roznica))
+    assert.ok(obrazyPdf.roznice.every((roznica) => roznica.liczbaRoznic / roznica.liczbaPikseli < 0.001), `Oba tryby zachowują wygląd PDF z tolerancją 0,1% pikseli: ${JSON.stringify(obrazyPdf.roznice.map(({ liczbaRoznic, liczbaPikseli, obszar }) => ({ liczbaRoznic, liczbaPikseli, obszar })))}`)
     await strona.goto(adres)
     const wpisDrugiej = strona.getByRole('region', { name: 'Paczki do wysłania' }).locator('article').filter({ hasText: 'Druga przesyłka' })
     await wpisDrugiej.getByRole('button', { name: 'Otwórz checklistę', exact: true }).click()
@@ -727,7 +749,7 @@ test('checklisty: pisanie nie zapisuje rejestru co znak, podpowiedzi zachowują 
     // Po zapisie historia nie może uruchamiać kolejnych zapisów bez edycji.
     await strona.waitForTimeout(1000)
     assert.equal(await strona.evaluate(() => window.zapisyChecklisty), 1)
-    assert.ok(await strona.locator('#checklista-miejscowosci option').count() > 0)
+    await strona.waitForFunction(() => document.querySelectorAll('#checklista-miejscowosci option').length > 0)
     assert.ok(await strona.locator('#checklista-trenerzy option').count() > 0)
     const trener = await strona.locator('#checklista-trenerzy option').first().getAttribute('value')
     const trenerzy = strona.getByLabel('Trenerzy (oddziel przecinkiem)', { exact: true })

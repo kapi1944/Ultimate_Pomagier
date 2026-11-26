@@ -2,7 +2,6 @@ import { KontekstZatwierdzania } from '../komponenty/zatwierdzaniePol'
 import { RegulacjaSzerokosci } from '../../../../wspolne/komponenty/RegulacjaSzerokosci'
 import { zdarzenieZmianySkaliInterfejsu } from '../../../../aplikacja/ustawienia/skalaInterfejsu'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent, type KeyboardEvent, type ReactNode } from 'react'
-import { pobierzNazwyMiejscowosci } from '../../../../kartoteki/lokalizacje/magazynLokalizacji'
 import type { Dokument } from '../../../../wspolne/dokumenty/modelDokumentu'
 import { utworzDokumentZeSzczegolow } from '../../../../wspolne/integracje/szczegolyDoDokumentow'
 import KartaGrupySzkoleniowej from '../komponenty/KartaGrupySzkoleniowej'
@@ -106,7 +105,6 @@ type WlasciwosciPolFirmy = {
   disabled?: boolean
   statusyPol: ReturnType<typeof useGeneratorSzczegolow>['statusyPol']
   aktualizujPole: (klucz: KluczFirmy, wartosc: string) => void
-  miejscowosciDoPodpowiedzi: string[]
   elementNaglowka?: ReactNode
 }
 
@@ -130,20 +128,13 @@ type PodgladWzoruKlienta = {
   typ: string
 }
 
-function wybierzPodpowiedziMiejscowosci(miejscowosci: string[], wartosc: string) {
-  const fraza = wartosc.trim().toLocaleLowerCase('pl')
-  if (!fraza) return miejscowosci.slice(0, 50)
-  return miejscowosci.filter((miejscowosc) => !fraza || miejscowosc.toLocaleLowerCase('pl').includes(fraza)).slice(0, 50)
-}
-
 function czyWersjaMaPoprzednia(wersje: WpisHistoriiSzczegolow[], wersjaId: string, dokumentId?: string) {
   const wersjeTegoDokumentu = wersje.filter((wersja) => wersja.typ === 'wersja' && wersja.dokumentId === dokumentId)
   return wersjeTegoDokumentu.findIndex((wersja) => wersja.id === wersjaId) < wersjeTegoDokumentu.length - 1
 }
 
-function PolaFirmy({ tytul, prefix, dane, disabled, statusyPol, aktualizujPole, miejscowosciDoPodpowiedzi, elementNaglowka }: WlasciwosciPolFirmy) {
+function PolaFirmy({ tytul, prefix, dane, disabled, statusyPol, aktualizujPole, elementNaglowka }: WlasciwosciPolFirmy) {
   const czyNabywca = prefix === 'nabywca'
-  const podpowiedziMiasta = useMemo(() => wybierzPodpowiedziMiejscowosci(miejscowosciDoPodpowiedzi, dane.miasto), [miejscowosciDoPodpowiedzi, dane.miasto])
 
   return (
     <section className="szczegoly-kolumna-danych">
@@ -170,7 +161,7 @@ function PolaFirmy({ tytul, prefix, dane, disabled, statusyPol, aktualizujPole, 
           disabled={disabled}
           etykieta="Miasto"
           listaPodpowiedziId={`miejscowosci-${prefix}`}
-          podpowiedzi={podpowiedziMiasta}
+          podpowiadajMiejscowosci
           pole={`${prefix}.miasto`}
           statusyPol={statusyPol}
           wartosc={dane.miasto}
@@ -307,8 +298,6 @@ export default function WidokNowychSzczegolowOrganizacyjnych({ otworzDokument }:
   const stanKompletnosci = generator.czyFormularzKompletny ? 'Kompletny' : `Niekompletny (${liczbaProblemowBlokujacych})`
   const statusFormularza = !generator.aktywnaKopiaId && !generator.czyNiezapisaneZmiany ? stanZapisu : `${stanZapisu} | ${stanKompletnosci}`
   const kompletneSekcjeNawigacji = useMemo(() => pobierzIdKompletnychSekcji(generator.modelSekcyjny), [generator.modelSekcyjny])
-  const miejscowosciDoPodpowiedzi = useMemo(() => pobierzNazwyMiejscowosci(), [])
-  const podpowiedziMiastaPaczki = useMemo(() => wybierzPodpowiedziMiejscowosci(miejscowosciDoPodpowiedzi, generator.daneFormularza.odbiorcaPaczki.miasto), [miejscowosciDoPodpowiedzi, generator.daneFormularza.odbiorcaPaczki.miasto])
   const liczbaUkrytychWpisowHistorii = pobierzLiczbeUkrytychWpisowHistorii(generator.historiaSzczegolow)
   const widoczneWpisyHistorii = pobierzWidoczneWpisyHistorii(generator.historiaSzczegolow, czyHistoriaRozwinieta)
   const wersjeHistorii = generator.historiaSzczegolow.filter((wpis) => wpis.typ === 'wersja')
@@ -855,7 +844,6 @@ export default function WidokNowychSzczegolowOrganizacyjnych({ otworzDokument }:
                   ustawZaznaczone={ustawCzyNabywcaJestOdbiorca}
                 />
               }
-              miejscowosciDoPodpowiedzi={miejscowosciDoPodpowiedzi}
               prefix="nabywca"
               statusyPol={generator.statusyPol}
               tytul="Nabywca"
@@ -864,7 +852,6 @@ export default function WidokNowychSzczegolowOrganizacyjnych({ otworzDokument }:
               aktualizujPole={aktualizujOdbiorce}
               dane={pobierzEfektywneDaneOdbiorcy(generator.daneFormularza)}
               disabled={generator.daneFormularza.czyNabywcaJestOdbiorca}
-              miejscowosciDoPodpowiedzi={miejscowosciDoPodpowiedzi}
               prefix="odbiorca"
               statusyPol={generator.statusyPol}
               tytul="Odbiorca"
@@ -1092,7 +1079,7 @@ export default function WidokNowychSzczegolowOrganizacyjnych({ otworzDokument }:
                 disabled={!generator.daneFormularza.wysylkaPaczkiDotyczy}
                 etykieta="Miasto"
                 listaPodpowiedziId="miejscowosci-odbiorca-paczki"
-                podpowiedzi={podpowiedziMiastaPaczki}
+                podpowiadajMiejscowosci
                 pole="odbiorcaPaczki.miasto"
                 statusyPol={generator.statusyPol}
                 wartosc={generator.daneFormularza.odbiorcaPaczki.miasto}
