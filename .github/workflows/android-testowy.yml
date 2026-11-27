@@ -1,0 +1,45 @@
+name: Testowy APK Android
+
+# Ręcznie uruchamiany build debug APK do testów na telefonie.
+# Nie jest wydaniem produkcyjnym: nie używa sekretów ani certyfikatu wydawcy.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android-testowy:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v4
+        with:
+          cmdline-tools-version: '12266719'
+          packages: 'platform-tools'
+      - name: Instalacja narzędzi Android
+        run: sdkmanager 'ndk;27.2.12479018' 'platforms;android-36' 'build-tools;36.0.0'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      - run: npm ci
+      - name: Budowanie testowego (debug) APK
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+        run: npm run android:build:test
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Ultimate-Pomagier-Android-TESTOWY
+          path: wydanie-android/testowe/Ultimate_Pomagier_TESTOWY_arm64.apk
+          if-no-files-found: error
+          retention-days: 14
