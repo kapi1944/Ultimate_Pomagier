@@ -39,3 +39,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# graphify: w repozytorium trzymamy tylko graf; cache i pliki pomocnicze zostają lokalnie
+graphify-out/*
+!graphify-out/graph.json
