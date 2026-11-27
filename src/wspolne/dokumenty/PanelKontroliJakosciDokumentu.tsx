@@ -100,9 +100,9 @@ export default function PanelKontroliJakosciDokumentu({
               <ul>
                 <li>Zgodność: {raportReplikacji.procentZgodnosci}% ({raportReplikacji.poziomZgodnosci})</li>
                 <li>Odtworzono: {raportReplikacji.odtworzono.join(', ') || '-'}</li>
-                <li>Nie odtworzono: {raportReplikacji.nieOdtworzono.join(', ') || '-'}</li>
+                <li>Nie odtworzono: {raportReplikacji.nieOdtworzono.map((pozycja) => pozycja.replace(/\.$/, '')).join('; ') || '-'}</li>
                 <li>Do poprawy: {raportReplikacji.wymagaPoprawy.join(', ') || '-'}</li>
-                <li>Ograniczenia: {raportReplikacji.ograniczenia.join(', ') || '-'}</li>
+                <li>Ograniczenia: {raportReplikacji.ograniczenia.map((pozycja) => pozycja.replace(/\.$/, '')).join('; ') || '-'}</li>
               </ul>
             </section>
           )}

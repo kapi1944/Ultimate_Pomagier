@@ -69,7 +69,7 @@ test('etykieta uniwersalna ma wspólny katalog, puste ilości i nie zmienia źr�
   const przed = structuredClone(dokument.daneDokumentu)
   const ustawienia = utworzUstawieniaEtykiety('uniwersalna')
   const wynik = pobierzEtykietyPaczek({ ...dokument, daneDokumentu: { ...przed, ustawieniaEtykiety: ustawienia } })[0]
-  assert.equal(wynik.pozycje.length, 13)
+  assert.equal(wynik.pozycje.length, 14)
   assert.ok(wynik.pozycje.every((pozycja) => pozycja.ilosc === null && !pozycja.czyUkryta))
   for (const pozycja of przed.pozycje) assert.ok(wynik.pozycje.some((material) => material.nazwa === pozycja.nazwa))
   assert.ok(wynik.pozycje.some((pozycja) => pozycja.nazwa === 'Program szkolenia'))
@@ -171,7 +171,7 @@ test('wspólna nazwa rozdziela numer dzienny od wersji', () => {
 test('nowa Checklista ma kategorie i pozycje zgodne z papierowym wzorem', () => {
   const dane = utworzDomyslneDaneChecklisty({ identyfikator: 'test', numerDzienny: 1 })
   assert.deepEqual(dane.kategorie.map((kategoria) => kategoria.nazwa), ['Materiały', 'Teczki', 'Pakiet CRM', 'Gadżety', 'Inne'])
-  for (const nazwa of ['Prezentacje', 'Podręczniki / materiały szkoleniowe', 'Materiały dodatkowe', 'Pre/Post-testy', 'Teczki', 'Lista obecności', 'Ankiety', 'Certyfikaty / Dyplomy', 'Karta na drzwi', 'Długopisy', 'Torby']) assert.ok(dane.pozycje.some((pozycja) => pozycja.nazwa === nazwa), `Brak domyślnej pozycji: ${nazwa}`)
+  for (const nazwa of ['Prezentacje', 'Podręczniki / materiały szkoleniowe', 'Materiały dodatkowe', 'Pre/Post-testy', 'Teczki', 'Programy', 'Lista obecności', 'Ankiety', 'Certyfikaty / Dyplomy', 'Karta na drzwi', 'Długopisy', 'Torby']) assert.ok(dane.pozycje.some((pozycja) => pozycja.nazwa === nazwa), `Brak domyślnej pozycji: ${nazwa}`)
   assert.equal(pobierzPozycje(dane, 'Teczki').uwagiDrukowane, '')
 })
 

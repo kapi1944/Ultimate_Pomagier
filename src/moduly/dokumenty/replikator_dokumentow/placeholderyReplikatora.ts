@@ -14,6 +14,8 @@ function normalizuj(tekst: string) {
     .toLocaleLowerCase('pl')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    // „ł” nie rozkłada się w NFD – bez tego „Tytuł szkolenia” i „Wykładowca” nie były rozpoznawane.
+    .replace(/ł/g, 'l')
 }
 
 function utworzPlaceholder(
@@ -52,7 +54,11 @@ function rozpoznajPlaceholderyBloku(blok: BlokDokumentu): PlaceholderReplikatora
     placeholdery.push(utworzPlaceholder(blok, 'szkolenie.data', 'Data', 'data', 'generator_szczegolow'))
   }
 
-  if (tekst.includes('trener')) {
+  if (tekst.includes('wymiar') || /liczba godzin|\bgodzin\b/.test(tekst)) {
+    placeholdery.push(utworzPlaceholder(blok, 'szkolenie.liczba_godzin', 'Wymiar szkolenia (godziny)', 'liczba', 'generator_szczegolow'))
+  }
+
+  if (tekst.includes('trener') || tekst.includes('wykladowca') || tekst.includes('prowadzacy')) {
     placeholdery.push(utworzPlaceholder(blok, 'szkolenie.trener', 'Trener', 'trener', 'generator_szczegolow'))
   }
 
@@ -64,7 +70,10 @@ function rozpoznajPlaceholderyBloku(blok: BlokDokumentu): PlaceholderReplikatora
     placeholdery.push(utworzPlaceholder(blok, 'szkolenie.organizator', 'Organizator', 'organizator', 'generator_szczegolow'))
   }
 
-  if (tekst.includes('miejsce') || tekst.includes('lokalizacja')) {
+  // „Miejsce na podpis/pieczęć/nazwę firmy” to pole do ręcznego wypełnienia, a nie lokalizacja szkolenia.
+  const czyMiejsceNaWpis = /miejsce na\b|pieczec|podpis/.test(tekst)
+
+  if (!czyMiejsceNaWpis && (tekst.includes('miejsce') || tekst.includes('lokalizacja'))) {
     placeholdery.push(utworzPlaceholder(blok, 'szkolenie.miejsce', 'Lokalizacja', 'lokalizacja', 'generator_szczegolow'))
   }
 

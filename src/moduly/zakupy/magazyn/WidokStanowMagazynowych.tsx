@@ -1,3 +1,4 @@
+import { pobierzParametrTrasyWyszukiwania } from '../../../aplikacja/wyszukiwanie/mechanizmWyszukiwania'
 import { useId, useState, type SyntheticEvent } from 'react'
 import type { StanZakupow } from '../modele/zakupy'
 import { czyWierszPasujeDoFiltra, filtryStanow, obliczMiarkeStanu, wyliczStanyMagazynowe, type FiltrStanow } from '../logika/stanyMagazynowe'
@@ -30,7 +31,8 @@ function MiarkaStanu({ stan, cel, minimum }: { stan: number; cel?: number; minim
 
 export default function WidokStanowMagazynowych({ dane }: { dane: StanZakupow }) {
   const [filtr, ustawFiltr] = useState<FiltrStanow>('wszystkie')
-  const wiersze = wyliczStanyMagazynowe(dane).filter((wiersz) => czyWierszPasujeDoFiltra(wiersz, filtr))
+  const produktZTrasy = pobierzParametrTrasyWyszukiwania('rekord')
+  const wiersze = wyliczStanyMagazynowe(dane).filter((wiersz) => (!produktZTrasy || wiersz.produkt.id === produktZTrasy) && czyWierszPasujeDoFiltra(wiersz, filtr))
 
   return (
     <section className="stany-magazynowe" aria-labelledby="stany-magazynowe-tytul">

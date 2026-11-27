@@ -1,3 +1,5 @@
+import { pobierzParametrTrasyWyszukiwania } from '../aplikacja/wyszukiwanie/mechanizmWyszukiwania'
+import { useOchronaNiezapisanegoDokumentu } from '../moduly/dokumenty/wspolne/useStanDokumentu'
 import { kluczKlientow, pobierzKlientowZKartoteki, type KlientKartoteki } from './klienciKartoteki'
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { zaladujCalyKatalogLokalizacji } from './lokalizacje/ladowanieKatalogu'
@@ -7,27 +9,18 @@ import {
 } from './lokalizacje/magazynLokalizacji'
 import type { Lokalizacja } from './lokalizacje/typyLokalizacji'
 import PrzelacznikTakNie from '../moduly/zamkniete/szczegoly_organizacyjne/komponenty/PrzelacznikTakNie'
-import { trenerzyKartotekiStartowi } from '../moduly/zamkniete/szczegoly_organizacyjne/stale'
+import { pobierzPelnaKartotekeTrenerow, type RekordKartotekiTrenera as TrenerKartoteki } from './trenerzyKartoteki'
 import WidokSzablonowDokumentow from './szablony_dokumentow/WidokSzablonowDokumentow'
 import './widokKartotek.css'
 
 export type ZakladkaKartotek = 'trenerzy' | 'klienci' | 'lokalizacje' | 'szablony_dokumentow'
-type StatusTrenera = 'Aktywny' | 'Nieaktywny'
+type StatusTrenera = TrenerKartoteki['status']
 type FiltrStatusuTrenera = 'aktywni' | 'nieaktywni' | 'wszyscy'
 type FiltrStatusuOdmiany = 'wszystkie' | 'potwierdzone' | 'niepotwierdzone'
 
 type WlasciwosciWidokuKartotek = {
   aktywnaZakladkaPoczatkowa?: ZakladkaKartotek
   poZmianieZakladki?: (zakladka: ZakladkaKartotek) => void
-}
-
-type TrenerKartoteki = {
-  id: string
-  imie: string
-  nazwisko: string
-  telefon: string
-  email: string
-  status: StatusTrenera
 }
 
 type FormularzTrenera = Omit<TrenerKartoteki, 'id'>
@@ -368,86 +361,13 @@ function utworzId(prefiks: string) {
   return `${prefiks}-${Date.now()}`
 }
 
-function pobierzZMagazynu<T>(klucz: string, wartoscDomyslna: T[]): T[] {
-  try {
-    const zapis = localStorage.getItem(klucz)
-    const dane = zapis ? JSON.parse(zapis) : null
-
-    return Array.isArray(dane) ? dane : wartoscDomyslna
-  } catch {
-    return wartoscDomyslna
-  }
-}
-
-function pobierzKluczTrenera(trener: Pick<TrenerKartoteki, 'imie' | 'nazwisko'>) {
-  return normalizujTekst(`${trener.imie} ${trener.nazwisko}`)
-}
-
 function zapiszWMagazynie<T>(klucz: string, wartosc: T[]) {
   try {
     localStorage.setItem(klucz, JSON.stringify(wartosc))
+    return true
   } catch {
-    return
+    return false
   }
-}
-
-function rozdzielImieNazwisko(imieNazwisko: string) {
-  const czesci = imieNazwisko.trim().split(/\s+/)
-  const nazwisko = czesci.length > 1 ? czesci.pop() ?? '' : ''
-
-  return {
-    imie: czesci.join(' ') || imieNazwisko,
-    nazwisko,
-  }
-}
-
-function przygotujTrenerowStartowych(): TrenerKartoteki[] {
-  return trenerzyKartotekiStartowi.map((trener) => ({
-    id: trener.id,
-    ...rozdzielImieNazwisko(trener.imieNazwisko),
-    telefon: trener.telefon,
-    email: trener.email,
-    status: 'Aktywny',
-  }))
-}
-
-function czyStaraBazaTrenerow(trenerzy: TrenerKartoteki[]) {
-  const stareId = new Set(['trener-anna-kowalska', 'trener-piotr-nowak', 'trener-marta-zielinska'])
-
-  return trenerzy.length > 0 && trenerzy.every((trener) => stareId.has(trener.id) || trener.email.endsWith('@pomagier.local'))
-}
-
-function uzupelnijBazeTrenerow(trenerzyZMagazynu: TrenerKartoteki[]) {
-  const trenerzyStartowi = przygotujTrenerowStartowych()
-
-  if (!trenerzyZMagazynu.length || czyStaraBazaTrenerow(trenerzyZMagazynu)) {
-    return trenerzyStartowi
-  }
-
-  const trenerzyWedlugNazwy = new Map(trenerzyZMagazynu.map((trener) => [pobierzKluczTrenera(trener), trener]))
-  const trenerzyScaleni = trenerzyZMagazynu.map((trener) => {
-    const trenerStartowy = trenerzyStartowi.find((pozycja) => pobierzKluczTrenera(pozycja) === pobierzKluczTrenera(trener))
-
-    if (!trenerStartowy) {
-      return trener
-    }
-
-    return {
-      ...trener,
-      id: trener.id || trenerStartowy.id,
-      telefon: trener.telefon || trenerStartowy.telefon,
-      email: trener.email || trenerStartowy.email,
-      status: trener.status || trenerStartowy.status,
-    }
-  })
-
-  trenerzyStartowi.forEach((trener) => {
-    if (!trenerzyWedlugNazwy.has(pobierzKluczTrenera(trener))) {
-      trenerzyScaleni.push(trener)
-    }
-  })
-
-  return trenerzyScaleni
 }
 
 function normalizujTekst(wartosc: string) {
@@ -585,7 +505,7 @@ function skopiujFormularzLokalizacji(lokalizacja: Lokalizacja): FormularzLokaliz
 export default function WidokKartotek({ aktywnaZakladkaPoczatkowa = 'trenerzy', poZmianieZakladki }: WlasciwosciWidokuKartotek) {
   const referencjaAktywnejKartoteki = useRef<HTMLElement | null>(null)
   const [aktywnaZakladka, ustawAktywnaZakladke] = useState<ZakladkaKartotek>(aktywnaZakladkaPoczatkowa)
-  const [trenerzy, ustawTrenerow] = useState<TrenerKartoteki[]>(() => uzupelnijBazeTrenerow(pobierzZMagazynu(kluczTrenerow, przygotujTrenerowStartowych())))
+  const [trenerzy, ustawTrenerow] = useState<TrenerKartoteki[]>(pobierzPelnaKartotekeTrenerow)
   const [klienci, ustawKlientow] = useState<KlientKartoteki[]>(pobierzKlientowZKartoteki)
   const [lokalizacje, ustawLokalizacje] = useState<Lokalizacja[]>(pobierzLokalizacjeZMagazynu)
   // Pełny katalog (kilkadziesiąt tysięcy rekordów) jest wczytywany dopiero po wejściu w zakładkę lokalizacji.
@@ -595,17 +515,19 @@ export default function WidokKartotek({ aktywnaZakladkaPoczatkowa = 'trenerzy', 
   const [elementyKartoteki, ustawElementyKartoteki] = useState<DaneElementuKartoteki[]>([])
   const [liczbaPozycjiNaStronie, ustawLiczbePozycjiNaStronie] = useState(20)
 
-  const [filtrTrenerow, ustawFiltrTrenerow] = useState<FiltrStatusuTrenera>('aktywni')
-  const [stronaTrenerow, ustawStroneTrenerow] = useState(1)
+  const rekordZTrasy = pobierzParametrTrasyWyszukiwania('rekord')
+  const czyDodawanieZTrasy = pobierzParametrTrasyWyszukiwania('akcja') === 'dodaj'
+  const [filtrTrenerow, ustawFiltrTrenerow] = useState<FiltrStatusuTrenera>(rekordZTrasy ? 'wszyscy' : 'aktywni')
+  const [stronaTrenerow, ustawStroneTrenerow] = useState(() => Math.max(1, Math.floor(trenerzy.findIndex((trener) => trener.id === rekordZTrasy) / 20) + 1))
   const [czyFormularzTreneraWidoczny, ustawCzyFormularzTreneraWidoczny] = useState(false)
-  const [edytowanyTrenerId, ustawEdytowanyTrenerId] = useState<string | null>(null)
-  const [formularzTrenera, ustawFormularzTrenera] = useState<FormularzTrenera>(pustyFormularzTrenera)
+  const [edytowanyTrenerId, ustawEdytowanyTrenerId] = useState<string | null>(() => trenerzy.find((trener) => trener.id === rekordZTrasy)?.id ?? null)
+  const [formularzTrenera, ustawFormularzTrenera] = useState<FormularzTrenera>(() => { const trener = trenerzy.find((pozycja) => pozycja.id === rekordZTrasy); return trener ? skopiujFormularzTrenera(trener) : pustyFormularzTrenera })
 
   const [szukanyKlient, ustawSzukanyKlient] = useState('')
-  const [stronaKlientow, ustawStroneKlientow] = useState(1)
-  const [czyFormularzKlientaWidoczny, ustawCzyFormularzKlientaWidoczny] = useState(false)
-  const [edytowanyKlientId, ustawEdytowanyKlientId] = useState<string | null>(null)
-  const [formularzKlienta, ustawFormularzKlienta] = useState<FormularzKlienta>(pustyFormularzKlienta)
+  const [stronaKlientow, ustawStroneKlientow] = useState(() => Math.max(1, Math.floor(klienci.findIndex((klient) => klient.id === rekordZTrasy) / 20) + 1))
+  const [czyFormularzKlientaWidoczny, ustawCzyFormularzKlientaWidoczny] = useState(czyDodawanieZTrasy)
+  const [edytowanyKlientId, ustawEdytowanyKlientId] = useState<string | null>(() => klienci.find((klient) => klient.id === rekordZTrasy)?.id ?? null)
+  const [formularzKlienta, ustawFormularzKlienta] = useState<FormularzKlienta>(() => { const klient = klienci.find((pozycja) => pozycja.id === rekordZTrasy); return klient ? skopiujFormularzKlienta(klient) : pustyFormularzKlienta })
 
   const [szukanaLokalizacja, ustawSzukanaLokalizacja] = useState('')
   const [filtrWojewodztwa, ustawFiltrWojewodztwa] = useState('wszystkie')
@@ -750,6 +672,19 @@ export default function WidokKartotek({ aktywnaZakladkaPoczatkowa = 'trenerzy', 
     [bezpiecznaStronaLokalizacji, liczbaPozycjiNaStronie, lokalizacjeFiltrowane],
   )
 
+  const edytowanyTrener = trenerzy.find((rekord) => rekord.id === edytowanyTrenerId)
+  const edytowanyKlient = klienci.find((rekord) => rekord.id === edytowanyKlientId)
+  const edytowanaLokalizacja = lokalizacje.find((rekord) => rekord.klucz_lokalizacji === edytowanaLokalizacjaId)
+  const czyTrenerZmieniony = Boolean((czyFormularzTreneraWidoczny || edytowanyTrenerId) && JSON.stringify(formularzTrenera) !== JSON.stringify(edytowanyTrener ? skopiujFormularzTrenera(edytowanyTrener) : pustyFormularzTrenera))
+  const czyKlientZmieniony = Boolean((czyFormularzKlientaWidoczny || edytowanyKlientId) && JSON.stringify(formularzKlienta) !== JSON.stringify(edytowanyKlient ? skopiujFormularzKlienta(edytowanyKlient) : pustyFormularzKlienta))
+  const czyLokalizacjaZmieniona = Boolean((czyFormularzLokalizacjiWidoczny || edytowanaLokalizacjaId) && JSON.stringify(formularzLokalizacji) !== JSON.stringify(edytowanaLokalizacja ? skopiujFormularzLokalizacji(edytowanaLokalizacja) : pustyFormularzLokalizacji))
+  useOchronaNiezapisanegoDokumentu(czyTrenerZmieniony || czyKlientZmieniony || czyLokalizacjaZmieniona, () => {
+    if (czyTrenerZmieniony && !zapiszTrenera()) return false
+    if (czyKlientZmieniony && !zapiszKlienta()) return false
+    if (czyLokalizacjaZmieniona && !zapiszLokalizacje()) return false
+    return true
+  })
+
   function pokazKomunikat(tresc: string) {
     ustawKomunikat(tresc)
   }
@@ -766,24 +701,17 @@ export default function WidokKartotek({ aktywnaZakladkaPoczatkowa = 'trenerzy', 
     ustawCzyFormularzTreneraWidoczny(false)
   }
 
-  function zapiszTrenera(zdarzenie: FormEvent<HTMLFormElement>) {
-    zdarzenie.preventDefault()
-
-    if (!formularzTrenera.imie.trim() || !formularzTrenera.nazwisko.trim()) {
-      return
-    }
-
-    if (edytowanyTrenerId) {
-      ustawTrenerow((obecni) => obecni.map((trener) => (trener.id === edytowanyTrenerId ? { ...trener, ...formularzTrenera } : trener)))
-      pokazKomunikat('Zapisano dane trenera.')
-      ustawEdytowanyTrenerId(null)
-      window.setTimeout(() => ustawFormularzTrenera(pustyFormularzTrenera), 280)
-    } else {
-      ustawTrenerow((obecni) => [...obecni, { id: utworzId('trener'), ...formularzTrenera }])
-      pokazKomunikat('Dodano trenera do kartoteki.')
-      ustawFormularzTrenera(pustyFormularzTrenera)
-      ustawCzyFormularzTreneraWidoczny(false)
-    }
+  function zapiszTrenera(zdarzenie?: FormEvent<HTMLFormElement>) {
+    zdarzenie?.preventDefault()
+    if (!formularzTrenera.imie.trim() || !formularzTrenera.nazwisko.trim()) return false
+    const noweDane = edytowanyTrenerId ? trenerzy.map((rekord) => rekord.id === edytowanyTrenerId ? { ...rekord, ...formularzTrenera } : rekord) : [...trenerzy, { id: utworzId('trener'), ...formularzTrenera }]
+    if (!zapiszWMagazynie(kluczTrenerow, noweDane)) { pokazKomunikat('Nie udało się zapisać danych. Pozostały w formularzu.'); return false }
+    ustawTrenerow(noweDane)
+    pokazKomunikat('Zapisano dane kartoteki.')
+    ustawFormularzTrenera(pustyFormularzTrenera)
+    ustawEdytowanyTrenerId(null)
+    ustawCzyFormularzTreneraWidoczny(false)
+    return true
   }
 
   function duplikujTrenera(trener: TrenerKartoteki) {
@@ -814,24 +742,17 @@ export default function WidokKartotek({ aktywnaZakladkaPoczatkowa = 'trenerzy', 
     ustawCzyFormularzKlientaWidoczny(false)
   }
 
-  function zapiszKlienta(zdarzenie: FormEvent<HTMLFormElement>) {
-    zdarzenie.preventDefault()
-
-    if (!formularzKlienta.nazwa.trim()) {
-      return
-    }
-
-    if (edytowanyKlientId) {
-      ustawKlientow((obecni) => obecni.map((klient) => (klient.id === edytowanyKlientId ? { ...klient, ...formularzKlienta } : klient)))
-      pokazKomunikat('Zapisano dane klienta.')
-    } else {
-      ustawKlientow((obecni) => [...obecni, { id: utworzId('klient'), ...formularzKlienta }])
-      pokazKomunikat('Dodano klienta do kartoteki.')
-    }
-
+  function zapiszKlienta(zdarzenie?: FormEvent<HTMLFormElement>) {
+    zdarzenie?.preventDefault()
+    if (!formularzKlienta.nazwa.trim()) return false
+    const noweDane = edytowanyKlientId ? klienci.map((rekord) => rekord.id === edytowanyKlientId ? { ...rekord, ...formularzKlienta } : rekord) : [...klienci, { id: utworzId('klient'), ...formularzKlienta }]
+    if (!zapiszWMagazynie(kluczKlientow, noweDane)) { pokazKomunikat('Nie udało się zapisać danych. Pozostały w formularzu.'); return false }
+    ustawKlientow(noweDane)
+    pokazKomunikat('Zapisano dane kartoteki.')
     ustawFormularzKlienta(pustyFormularzKlienta)
     ustawEdytowanyKlientId(null)
     ustawCzyFormularzKlientaWidoczny(false)
+    return true
   }
 
   function duplikujKlienta(klient: KlientKartoteki) {
@@ -878,24 +799,17 @@ export default function WidokKartotek({ aktywnaZakladkaPoczatkowa = 'trenerzy', 
     ustawFormularzLokalizacji(pustyFormularzLokalizacji)
   }
 
-  function zapiszLokalizacje(zdarzenie: FormEvent<HTMLFormElement>) {
-    zdarzenie.preventDefault()
-
-    if (!formularzLokalizacji.nazwa.trim() || !formularzLokalizacji.miejscownik_pelny_auto.trim()) {
-      return
-    }
-
-    if (edytowanaLokalizacjaId) {
-      ustawLokalizacje((obecne) => obecne.map((lokalizacja) => (lokalizacja.klucz_lokalizacji === edytowanaLokalizacjaId ? { ...lokalizacja, ...formularzLokalizacji } : lokalizacja)))
-      pokazKomunikat('Zapisano dane lokalizacji.')
-    } else {
-      ustawLokalizacje((obecne) => [...obecne, { klucz_lokalizacji: utworzId('lokalizacja'), ...formularzLokalizacji }])
-      pokazKomunikat('Dodano lokalizację do kartoteki.')
-    }
-
+  function zapiszLokalizacje(zdarzenie?: FormEvent<HTMLFormElement>) {
+    zdarzenie?.preventDefault()
+    if (!formularzLokalizacji.nazwa.trim() || !formularzLokalizacji.miejscownik_pelny_auto.trim()) return false
+    const noweDane = edytowanaLokalizacjaId ? lokalizacje.map((rekord) => rekord.klucz_lokalizacji === edytowanaLokalizacjaId ? { ...rekord, ...formularzLokalizacji } : rekord) : [...lokalizacje, { klucz_lokalizacji: utworzId('lokalizacja'), ...formularzLokalizacji }]
+    if (!zapiszLokalizacjeWMagazynie(noweDane)) { pokazKomunikat('Nie udało się zapisać danych. Pozostały w formularzu.'); return false }
+    ustawLokalizacje(noweDane)
+    pokazKomunikat('Zapisano dane kartoteki.')
     ustawFormularzLokalizacji(pustyFormularzLokalizacji)
     ustawEdytowanaLokalizacjaId(null)
     ustawCzyFormularzLokalizacjiWidoczny(false)
+    return true
   }
 
   function duplikujLokalizacje(lokalizacja: Lokalizacja) {

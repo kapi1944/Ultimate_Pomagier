@@ -1,3 +1,4 @@
+import { pobierzParametrTrasyWyszukiwania } from '../../../../aplikacja/wyszukiwanie/mechanizmWyszukiwania'
 import { useMemo, useState } from 'react'
 import type { OpublikowaneSzczegolyOrganizacyjne, WersjaRoboczaGeneratora } from '../typy'
 import { AkcjeRekordu } from '../../../../wspolne/komponenty/AkcjeRekordu'
@@ -32,8 +33,8 @@ function czyStatusOczekujacy(status: string) {
 }
 export default function WidokListySzczegolowOrganizacyjnych({ otworzNoweSzczegoly, otworzKopieRobocza }: WlasciwosciWidokuListy) {
   const konto = useMemo(() => pobierzAktywneKontoSzczegolow(), [])
-  const [rekordy, ustawRekordy] = useState(() => pobierzOpublikowaneSzczegoly())
-  const [podgladRekorduId, ustawPodgladRekorduId] = useState<string | null>(null)
+  const [rekordy, ustawRekordy] = useState(() => { const id = pobierzParametrTrasyWyszukiwania('rekord'); return pobierzOpublikowaneSzczegoly().sort((pierwszy, drugi) => Number(drugi.id === id) - Number(pierwszy.id === id)) })
+  const [podgladRekorduId, ustawPodgladRekorduId] = useState<string | null>(() => pobierzParametrTrasyWyszukiwania('rekord'))
 
   function duplikujRekord(rekord: OpublikowaneSzczegolyOrganizacyjne) {
     otworzKopieRobocza(() => duplikujOpublikowaneSzczegoly(rekord, konto))

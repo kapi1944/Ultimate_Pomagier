@@ -260,7 +260,7 @@ export function utworzSzablonRoboczyZDokumentu(
 ): SzablonRoboczyReplikatora {
   const typDokumentu = mapujTypDokumentu(dokument.metadane.mozliwyTypDokumentu)
   const dokumentBlokowy = utworzDokumentBlokowyZDokumentuPomagiera(dokument, typDokumentu)
-  const raportImportu = utworzRaportReplikacji(dokumentBlokowy, zrodloImportu, ograniczenia)
+  const raportImportu = utworzRaportReplikacji(dokumentBlokowy, zrodloImportu, ograniczenia, dokument)
   const bloki = pobierzBlokiReplikatora(dokumentBlokowy)
   const placeholdery = wykryjPlaceholderyReplikatora(dokumentBlokowy)
 
@@ -374,7 +374,8 @@ export async function importujDocxReplikatora(plik: File, uzytkownik: string): P
   const wynik = await importujPlikDoDokumentu(plik)
   const szablonRoboczy = utworzSzablonRoboczyZDokumentu(wynik.dokument, 'DOCX', uzytkownik, [
     'Nieobsługiwane elementy DOCX są zachowane jako ElementNieobslugiwany zamiast cichego usunięcia.',
-    'Pozycjonowanie absolutne i elementy pływające wymagają ręcznej kontroli.',
+    // Ostrzeżenia importera (np. obiekty VML, kształty bez grafiki) obniżają wynik zgodności.
+    ...wynik.dokument.metadane.ostrzezenia,
   ], [
     {
       id: `decyzja-import-${Date.now()}`,
