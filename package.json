@@ -1,7 +1,7 @@
 {
   "name": "ultimate-pomagier",
   "private": true,
-  "version": "4.1.1",
+  "version": "4.1.2",
   "type": "module",
   "scripts": {
     "pretest": "node --import ./testy/rejestrujLoaderTs.mjs testy/zapisRejestruPrzyBrakuMiejsca.test.ts && node --import ./testy/rejestrujLoaderTs.mjs testy/swobodneBlokiDokumentu.test.ts && node --import ./testy/rejestrujLoaderTs.mjs testy/wspolnyStandardGeneratorow.test.ts && node --import ./testy/rejestrujLoaderTs.mjs testy/generatoryOperacyjne.test.ts && node --import ./testy/rejestrujLoaderTs.mjs --test testy/indeksLokalizacjiSzczegolow.test.ts && node --import ./testy/rejestrujLoaderTs.mjs --test testy/autosaveSzczegolowOdroczony.test.ts && npm run test:bezpieczenstwo && npm run test:pakiety-pdf",

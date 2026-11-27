@@ -1,6 +1,6 @@
 [package]
 name = "ultimate-pomagier"
-version = "4.1.1"
+version = "4.1.2"
 description = "Ultimate Pomagier"
 edition = "2021"
 rust-version = "1.85"
